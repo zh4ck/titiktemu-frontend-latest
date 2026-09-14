@@ -1,18 +1,18 @@
 "use client";
 
-// UMKM-facing self-service form for the "UMKM Self-Tracker" page
-// (Figma frames 15004:6228, 6249, 6270, 6293, 6348 + alerts 6403/6404/6405).
+// UMKM-facing self-service form for the "UMKM Self-Tracker" page.
 //
-// UI-ONLY: there is no backend support yet for a UMKM to submit or edit
-// their own business, no approval-status field, and no submission-tracking
-// tied to an account (confirmed by full backend research). Every field
-// below is scaffolding: the whole draft/saved/pending/approved/rejected
-// state machine, the "Riwayat Laporan" history, and the operator-approval
-// simulation links are all persisted to this browser's localStorage only,
-// so the flow can be demoed end-to-end across reloads without a real
-// backend. None of it is shared across devices or visible to an operator.
-// The photo field never uploads a file anywhere -- only the chosen
-// filename string is kept, standing in for a future real upload.
+// Fields here mirror what titiktemu-analytics' survey ingestion actually
+// consumes (src/ingestion/umkm_survey.py: tenant_type, revenue_per_month,
+// transaction_per_day high/normal/low split, transaction_per_buyer,
+// rent amount+period, rent_expiry_date, rent_trend) instead of the
+// earlier version's invented fields (a price-range dropdown, free-text
+// "Titik Lokasi" instead of real coordinates) -- see
+// app/types/self-report.ts. Submission now goes to a real backend
+// endpoint (POST /api/umkm-self-reports); the draft/saved/pending/history
+// workflow around it is still simulated client-side (persisted to
+// localStorage) since there is no per-user submission-status endpoint yet,
+// but the actual submitted data is real, not a demo fabrication.
 
 import { useMemo, useState } from "react";
 import {
@@ -25,7 +25,10 @@ import {
 import { Dropdown, type DropdownOption } from "@/app/components/ui/dropdown";
 import { FieldLabel, Input } from "@/app/components/ui/input";
 import { FileInput } from "@/app/components/ui/file-input";
-import { CheckCircle2, Info, XCircle } from "lucide-react";
+import { CheckCircle2, Info, LocateFixed, XCircle } from "lucide-react";
+import { useCurrentLocation } from "@/app/hooks/use-current-location";
+import { useSubmitSelfReport } from "@/app/hooks/use-self-reports";
+import type { RentPeriodUnit, TenantType } from "@/app/types/self-report";
 
 const STORAGE_PREFIX = "titiktemu:umkm-self-tracker:";
 const FORM_KEY = `${STORAGE_PREFIX}form`;
@@ -38,9 +41,22 @@ type SubmissionStatus = "draft" | "saved" | "pending" | "approved" | "rejected";
 type FormState = {
   fotoUsahaName: string;
   namaUsaha: string;
+  deskripsi: string;
   kategori: string;
-  rentangHarga: string;
-  titikLokasi: string;
+  tenantType: TenantType | "";
+  latitude: string;
+  longitude: string;
+  luasTempatM2: string;
+  targetPasar: string;
+  hargaSewa: string;
+  periodeSewa: RentPeriodUnit | "";
+  tanggalBerakhirSewa: string;
+  pendapatanPerBulan: string;
+  transaksiTinggi: string;
+  transaksiNormal: string;
+  transaksiRendah: string;
+  rataRataPerPembeli: string;
+  trenSewaPersen: string;
   statusUsaha: string;
 };
 
@@ -53,9 +69,22 @@ type HistoryEntry = {
 const EMPTY_FORM: FormState = {
   fotoUsahaName: "",
   namaUsaha: "",
+  deskripsi: "",
   kategori: "",
-  rentangHarga: "",
-  titikLokasi: "",
+  tenantType: "",
+  latitude: "",
+  longitude: "",
+  luasTempatM2: "",
+  targetPasar: "",
+  hargaSewa: "",
+  periodeSewa: "",
+  tanggalBerakhirSewa: "",
+  pendapatanPerBulan: "",
+  transaksiTinggi: "",
+  transaksiNormal: "",
+  transaksiRendah: "",
+  rataRataPerPembeli: "",
+  trenSewaPersen: "",
   statusUsaha: "",
 };
 
@@ -70,12 +99,20 @@ const KATEGORI_OPTIONS: DropdownOption[] = [
   { value: "lainnya", label: "Lainnya" },
 ];
 
-const HARGA_OPTIONS: DropdownOption[] = [
-  { value: "10-50", label: "Rp 10.000 - Rp 50.000" },
-  { value: "50-100", label: "Rp 50.000 - Rp 100.000" },
-  { value: "100-250", label: "Rp 100.000 - Rp 250.000" },
-  { value: "250-500", label: "Rp 250.000 - Rp 500.000" },
-  { value: "500-plus", label: "> Rp 500.000" },
+// Mirrors titiktemu-analytics' TENANT_TYPE_MAP normalized values exactly
+// (src/ingestion/umkm_survey.py) -- this is the field the pipeline's GWR
+// modeling actually reads, distinct from the informal "Kategori" above.
+const TENANT_TYPE_OPTIONS: DropdownOption[] = [
+  { value: "umkm_tetap", label: "UMKM Tetap" },
+  { value: "umkm_seasonal", label: "UMKM Musiman" },
+  { value: "franchise_tetap", label: "Franchise Tetap" },
+  { value: "franchise_seasonal", label: "Franchise Musiman" },
+];
+
+const RENT_PERIOD_OPTIONS: DropdownOption[] = [
+  { value: "hari", label: "Per Hari" },
+  { value: "bulan", label: "Per Bulan" },
+  { value: "tahun", label: "Per Tahun" },
 ];
 
 const STATUS_USAHA_OPTIONS: DropdownOption[] = [
@@ -88,8 +125,8 @@ function isFormComplete(form: FormState): boolean {
     form.fotoUsahaName.trim().length > 0 &&
     form.namaUsaha.trim().length > 0 &&
     form.kategori.trim().length > 0 &&
-    form.rentangHarga.trim().length > 0 &&
-    form.titikLokasi.trim().length > 0 &&
+    form.latitude.trim().length > 0 &&
+    form.longitude.trim().length > 0 &&
     form.statusUsaha.trim().length > 0
   );
 }
@@ -186,6 +223,13 @@ function formatFull(iso: string): string {
   });
 }
 
+function toNumberOrUndefined(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 type BannerState = { variant: "info" | "success" | "error"; title: string; description: string } | null;
 
 const STATUS_PANEL_LABEL: Record<Extract<SubmissionStatus, "pending" | "approved" | "rejected">, string> = {
@@ -208,6 +252,8 @@ export default function UmkmSelfTrackerForm() {
   const [form, setForm] = useState<FormState>(() => loadForm());
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
   const [banner, setBanner] = useState<BannerState>(null);
+  const { location: currentLocation, status: locationStatus } = useCurrentLocation();
+  const submitSelfReport = useSubmitSelfReport();
 
   function pushHistory(action: string) {
     setHistory((prev) => {
@@ -228,6 +274,12 @@ export default function UmkmSelfTrackerForm() {
     });
   }
 
+  function useMyLocation() {
+    if (!currentLocation) return;
+    updateField("latitude", String(currentLocation.lat));
+    updateField("longitude", String(currentLocation.lng));
+  }
+
   function handleSimpan() {
     if (!isFormComplete(form)) return;
     saveForm(form);
@@ -243,14 +295,56 @@ export default function UmkmSelfTrackerForm() {
   }
 
   function handleAjukan() {
-    setStatus("pending");
-    saveStatus("pending");
-    pushHistory("Formulir diajukan");
-    setBanner({
-      variant: "info",
-      title: "Pengajuan Terkirim",
-      description: "Formulir usaha kamu telah dikirim dan sedang menunggu peninjauan.",
-    });
+    const lat = toNumberOrUndefined(form.latitude);
+    const lng = toNumberOrUndefined(form.longitude);
+    if (lat === undefined || lng === undefined) {
+      setBanner({
+        variant: "error",
+        title: "Lokasi belum lengkap",
+        description: "Gunakan tombol \"Gunakan Lokasi Saat Ini\" atau isi koordinat secara manual.",
+      });
+      return;
+    }
+
+    submitSelfReport.mutate(
+      {
+        business_name: form.namaUsaha,
+        latitude: lat,
+        longitude: lng,
+        description: form.deskripsi.trim() || undefined,
+        tenant_type: form.tenantType || undefined,
+        tenant_area_m2: toNumberOrUndefined(form.luasTempatM2),
+        target_market: form.targetPasar.trim() || undefined,
+        rent_price_amount: toNumberOrUndefined(form.hargaSewa),
+        rent_period_unit: form.periodeSewa || undefined,
+        rent_expiry_date: form.tanggalBerakhirSewa || undefined,
+        revenue_per_month_idr: toNumberOrUndefined(form.pendapatanPerBulan),
+        txn_high_idr: toNumberOrUndefined(form.transaksiTinggi),
+        txn_normal_idr: toNumberOrUndefined(form.transaksiNormal),
+        txn_low_idr: toNumberOrUndefined(form.transaksiRendah),
+        transaction_per_buyer_idr: toNumberOrUndefined(form.rataRataPerPembeli),
+        rent_trend_pct: toNumberOrUndefined(form.trenSewaPersen),
+      },
+      {
+        onSuccess: () => {
+          setStatus("pending");
+          saveStatus("pending");
+          pushHistory("Formulir diajukan");
+          setBanner({
+            variant: "info",
+            title: "Pengajuan Terkirim",
+            description: "Formulir usaha kamu telah dikirim dan sedang menunggu peninjauan.",
+          });
+        },
+        onError: () => {
+          setBanner({
+            variant: "error",
+            title: "Gagal mengirim",
+            description: "Formulir gagal dikirim ke server. Periksa koneksi Anda dan coba lagi.",
+          });
+        },
+      },
+    );
   }
 
   function handleDemoApprove() {
@@ -326,6 +420,16 @@ export default function UmkmSelfTrackerForm() {
         </div>
 
         <div className="flex flex-col gap-2">
+          <FieldLabel>Deskripsi Produk</FieldLabel>
+          <Input
+            value={form.deskripsi}
+            disabled={!isEditable}
+            onChange={(event) => updateField("deskripsi", event.target.value)}
+            placeholder="Contoh: Nasi goreng dan aneka minuman"
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
           <FieldLabel required>Kategori</FieldLabel>
           <Dropdown
             options={KATEGORI_OPTIONS}
@@ -337,23 +441,163 @@ export default function UmkmSelfTrackerForm() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <FieldLabel required>Rentang Harga Produk</FieldLabel>
+          <FieldLabel>Jenis Penyewa</FieldLabel>
           <Dropdown
-            options={HARGA_OPTIONS}
-            value={form.rentangHarga || undefined}
+            options={TENANT_TYPE_OPTIONS}
+            value={form.tenantType || undefined}
             disabled={!isEditable}
-            onValueChange={(value) => updateField("rentangHarga", value)}
-            placeholder="Pilih rentang harga"
+            onValueChange={(value) => updateField("tenantType", value as TenantType)}
+            placeholder="Pilih jenis penyewa"
           />
         </div>
 
         <div className="flex flex-col gap-2">
-          <FieldLabel required>Titik Lokasi</FieldLabel>
+          <div className="flex items-center justify-between">
+            <FieldLabel required>Titik Lokasi (Koordinat)</FieldLabel>
+            <button
+              type="button"
+              disabled={!isEditable || !currentLocation}
+              onClick={useMyLocation}
+              className="flex items-center gap-1 text-b9 font-semibold text-primary-teal-70 hover:underline disabled:cursor-not-allowed disabled:text-neutral-400 disabled:no-underline"
+            >
+              <LocateFixed className="size-3.5" />
+              Gunakan Lokasi Saat Ini
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Input
+              value={form.latitude}
+              disabled={!isEditable}
+              onChange={(event) => updateField("latitude", event.target.value)}
+              placeholder="Latitude, contoh: -6.202065"
+            />
+            <Input
+              value={form.longitude}
+              disabled={!isEditable}
+              onChange={(event) => updateField("longitude", event.target.value)}
+              placeholder="Longitude, contoh: 106.821"
+            />
+          </div>
+          {locationStatus === "denied" && (
+            <p className="text-b9 text-behavior-red-30">
+              Akses lokasi ditolak -- isi koordinat secara manual atau aktifkan izin lokasi browser.
+            </p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-2">
+            <FieldLabel>Luas Tempat Usaha (m&sup2;)</FieldLabel>
+            <Input
+              type="number"
+              value={form.luasTempatM2}
+              disabled={!isEditable}
+              onChange={(event) => updateField("luasTempatM2", event.target.value)}
+              placeholder="Contoh: 12"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <FieldLabel>Target Pasar</FieldLabel>
+            <Input
+              value={form.targetPasar}
+              disabled={!isEditable}
+              onChange={(event) => updateField("targetPasar", event.target.value)}
+              placeholder="Contoh: Pekerja kantoran"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-2">
+            <FieldLabel>Harga Sewa</FieldLabel>
+            <Input
+              type="number"
+              value={form.hargaSewa}
+              disabled={!isEditable}
+              onChange={(event) => updateField("hargaSewa", event.target.value)}
+              placeholder="Contoh: 13000000"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <FieldLabel>Periode Sewa</FieldLabel>
+            <Dropdown
+              options={RENT_PERIOD_OPTIONS}
+              value={form.periodeSewa || undefined}
+              disabled={!isEditable}
+              onValueChange={(value) => updateField("periodeSewa", value as RentPeriodUnit)}
+              placeholder="Pilih periode"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-2">
+            <FieldLabel>Tanggal Berakhir Sewa</FieldLabel>
+            <Input
+              type="date"
+              value={form.tanggalBerakhirSewa}
+              disabled={!isEditable}
+              onChange={(event) => updateField("tanggalBerakhirSewa", event.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <FieldLabel>Tren Sewa (%/tahun)</FieldLabel>
+            <Input
+              type="number"
+              value={form.trenSewaPersen}
+              disabled={!isEditable}
+              onChange={(event) => updateField("trenSewaPersen", event.target.value)}
+              placeholder="Contoh: 10"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Pendapatan per Bulan (Rp)</FieldLabel>
           <Input
-            value={form.titikLokasi}
+            type="number"
+            value={form.pendapatanPerBulan}
             disabled={!isEditable}
-            onChange={(event) => updateField("titikLokasi", event.target.value)}
-            placeholder="Contoh: Blok B (DA-1231)"
+            onChange={(event) => updateField("pendapatanPerBulan", event.target.value)}
+            placeholder="Contoh: 15000000"
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Transaksi per Hari (Rp) -- Ramai / Normal / Sepi</FieldLabel>
+          <div className="grid grid-cols-3 gap-2">
+            <Input
+              type="number"
+              value={form.transaksiTinggi}
+              disabled={!isEditable}
+              onChange={(event) => updateField("transaksiTinggi", event.target.value)}
+              placeholder="Ramai"
+            />
+            <Input
+              type="number"
+              value={form.transaksiNormal}
+              disabled={!isEditable}
+              onChange={(event) => updateField("transaksiNormal", event.target.value)}
+              placeholder="Normal"
+            />
+            <Input
+              type="number"
+              value={form.transaksiRendah}
+              disabled={!isEditable}
+              onChange={(event) => updateField("transaksiRendah", event.target.value)}
+              placeholder="Sepi"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Rata-rata Transaksi per Pembeli (Rp)</FieldLabel>
+          <Input
+            type="number"
+            value={form.rataRataPerPembeli}
+            disabled={!isEditable}
+            onChange={(event) => updateField("rataRataPerPembeli", event.target.value)}
+            placeholder="Contoh: 35000"
           />
         </div>
 
@@ -393,10 +637,11 @@ export default function UmkmSelfTrackerForm() {
             {status === "saved" && (
               <button
                 type="button"
+                disabled={submitSelfReport.isPending}
                 onClick={handleAjukan}
-                className="flex h-12 flex-1 items-center justify-center rounded-lg bg-primary-teal-60 text-fig-sh7 text-neutral-0 transition-opacity hover:opacity-90"
+                className="flex h-12 flex-1 items-center justify-center rounded-lg bg-primary-teal-60 text-fig-sh7 text-neutral-0 transition-opacity hover:opacity-90 disabled:opacity-60"
               >
-                Ajukan Formulir
+                {submitSelfReport.isPending ? "Mengirim..." : "Ajukan Formulir"}
               </button>
             )}
           </div>
@@ -446,7 +691,7 @@ export default function UmkmSelfTrackerForm() {
               <button type="button" onClick={handleDemoReject} className="underline hover:text-behavior-red-20">
                 ditolak
               </button>{" "}
-              -- belum ada alur operator sungguhan )
+              -- status peninjauan operator sungguhan belum tersedia untuk laporan ini )
             </p>
           )}
         </section>

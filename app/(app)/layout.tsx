@@ -1,6 +1,7 @@
 import { AppSidebar } from "@/app/components/ui/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/app/components/ui/sidebar";
 import { ModeHeader } from "@/app/components/layout/mode-header";
+import { LocationBootstrap } from "@/app/components/layout/location-bootstrap";
 
 export default function AppShellLayout({
   children,
@@ -9,6 +10,7 @@ export default function AppShellLayout({
 }) {
   return (
     <SidebarProvider>
+      <LocationBootstrap />
       <AppSidebar />
       <div className="flex flex-1 flex-col min-w-0">
         <ModeHeader />

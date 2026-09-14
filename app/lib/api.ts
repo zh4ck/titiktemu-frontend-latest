@@ -12,6 +12,17 @@ import type {
   UmkmListFilters,
   UmkmListResult,
 } from "@/app/types/umkm";
+import type {
+  ReallocationRequest,
+  ReallocationRequestInput,
+  ReallocationRequestListResult,
+  ReallocationRequestStatus,
+} from "@/app/types/reallocation-request";
+import type {
+  UmkmSelfReport,
+  UmkmSelfReportInput,
+  UmkmSelfReportListResult,
+} from "@/app/types/self-report";
 import { createClient } from "@/app/lib/supabase/client";
 
 export async function apiFetch<T>(
@@ -95,6 +106,46 @@ export function fetchDashboardSummary(): Promise<DashboardSummary | null> {
 export function fetchPolicyRecommendations(recommendationType?: string): Promise<PolicyRecommendation[]> {
   const params = recommendationType ? `?recommendation_type=${recommendationType}` : "";
   return apiFetch<PolicyRecommendation[]>(`${API_URL}/api/policy-recommendations${params}`);
+}
+
+export function submitReallocationRequest(
+  input: ReallocationRequestInput,
+): Promise<ReallocationRequest> {
+  return apiFetch<ReallocationRequest>(`${API_URL}/api/reallocation-requests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchReallocationRequests(
+  status?: ReallocationRequestStatus,
+): Promise<ReallocationRequestListResult> {
+  const params = status ? `?status=${status}` : "";
+  return apiFetch<ReallocationRequestListResult>(`${API_URL}/api/reallocation-requests${params}`);
+}
+
+export function reviewReallocationRequest(
+  id: string,
+  status: Extract<ReallocationRequestStatus, "approved" | "rejected">,
+): Promise<ReallocationRequest> {
+  return apiFetch<ReallocationRequest>(`${API_URL}/api/reallocation-requests/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function submitUmkmSelfReport(input: UmkmSelfReportInput): Promise<UmkmSelfReport> {
+  return apiFetch<UmkmSelfReport>(`${API_URL}/api/umkm-self-reports`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchUmkmSelfReports(): Promise<UmkmSelfReportListResult> {
+  return apiFetch<UmkmSelfReportListResult>(`${API_URL}/api/umkm-self-reports`);
 }
 
 export function sendChatMessage(

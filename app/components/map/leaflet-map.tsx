@@ -41,9 +41,42 @@ export function LeafletMap({
           changes `center` afterwards. */}
       <RecenterOnChange center={center} />
       {flyTo && <FlyToLocation lat={flyTo.lat} lng={flyTo.lng} zoom={flyTo.zoom} />}
+      <InvalidateOnResize />
       {children}
     </MapContainer>
   );
+}
+
+/**
+ * Leaflet lays out tiles for whatever size its container div was when it
+ * last measured it, and never re-measures on its own -- so when the
+ * sidebar's CSS width transition (see app/components/ui/sidebar.tsx)
+ * resizes the map's container, Leaflet keeps rendering at the old size
+ * until a manual pan/zoom, leaving gray/blank tile gaps. A ResizeObserver
+ * on the map's own container + `map.invalidateSize()` fixes this for any
+ * resize cause (sidebar collapse, window resize, expand/collapse toggles),
+ * not just the sidebar specifically.
+ */
+function InvalidateOnResize() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    let frame: number | null = null;
+    const observer = new ResizeObserver(() => {
+      // Match the sidebar's own 200ms width transition so invalidateSize
+      // runs after layout has actually settled, not mid-transition.
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        window.setTimeout(() => map.invalidateSize(), 210);
+      });
+    });
+    observer.observe(container);
+    return () => {
+      observer.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [map]);
+  return null;
 }
 
 function FlyToLocation({ lat, lng, zoom }: { lat: number; lng: number; zoom?: number }) {

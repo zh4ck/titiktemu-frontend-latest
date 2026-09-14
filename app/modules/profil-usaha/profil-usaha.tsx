@@ -139,7 +139,15 @@ function Toggle({
       role="switch"
       aria-checked={checked}
       aria-label={label}
-      onClick={() => onChange(!checked)}
+      onClick={(event) => {
+        // Prevent the click from also bubbling to the row's own onClick
+        // below (this button is nested inside a row button/click target for
+        // a larger tap area) -- without this, a tap on the switch itself
+        // toggles twice (once here, once via the row) and visibly does
+        // nothing.
+        event.stopPropagation();
+        onChange(!checked);
+      }}
       className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
         checked ? "bg-primary-teal-60" : "bg-neutral-300"
       }`}
@@ -303,12 +311,24 @@ export default function ProfilUsaha() {
             </div>
 
             <div className="rounded-2xl border border-neutral-300">
-              <div className="flex items-center justify-between gap-4 p-4">
+              {/* The whole row toggles, not just the small 44x24 switch --
+                  tapping the label text used to do nothing, which read as
+                  "the toggle doesn't work" on touch devices where missing
+                  the switch itself by a few pixels is easy. A <div> (not a
+                  nested <button>) wraps the row, since the real <Toggle>
+                  button is already inside it and buttons can't nest. */}
+              <div
+                onClick={() => setTampilPeta((prev) => !prev)}
+                className="flex w-full cursor-pointer items-center justify-between gap-4 p-4"
+              >
                 <span className="text-b7 text-neutral-900">Tampil di peta publik</span>
                 <Toggle checked={tampilPeta} onChange={setTampilPeta} label="Tampil di peta publik" />
               </div>
               <div className="h-px bg-neutral-300" />
-              <div className="flex items-center justify-between gap-4 p-4">
+              <div
+                onClick={() => setTampilKontak((prev) => !prev)}
+                className="flex w-full cursor-pointer items-center justify-between gap-4 p-4"
+              >
                 <span className="text-b7 text-neutral-900">Bersedia dihubungi pengunjung</span>
                 <Toggle
                   checked={tampilKontak}

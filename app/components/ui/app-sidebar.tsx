@@ -8,6 +8,7 @@ import {
   Home,
   LogOut,
   Map,
+  MapPinned,
   UserRound,
   UsersRound,
   type LucideIcon,
@@ -57,6 +58,12 @@ const navigationItems: readonly NavigationItem[] = [
     label: "Profil Usaha",
     href: "/profil-usaha/",
     icon: UserRound,
+    roles: ["umkm"],
+  },
+  {
+    label: "Lihat Realokasi",
+    href: "/reallocation/",
+    icon: MapPinned,
     roles: ["umkm"],
   },
   {

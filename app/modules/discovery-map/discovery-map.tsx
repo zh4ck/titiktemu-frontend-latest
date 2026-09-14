@@ -17,6 +17,7 @@ import { useModelAccuracy } from "@/app/hooks/use-model-accuracy";
 import { useZoneLookup } from "@/app/hooks/use-zone-lookup";
 import { useUmkm } from "@/app/hooks/use-umkm";
 import { downloadCsv } from "@/app/lib/csv";
+import { NarrativeBlock } from "@/app/components/modules/narrative-block";
 import type { ZoneLabel } from "@/app/types/zones";
 
 // react-leaflet touches `window` at module-load time, which crashes Next's
@@ -32,6 +33,10 @@ const GeoJsonLayer = dynamic(
 );
 const CurrentLocationMarker = dynamic(
   () => import("@/app/components/map/current-location-marker").then((mod) => mod.CurrentLocationMarker),
+  { ssr: false },
+);
+const UmkmMarkerLayer = dynamic(
+  () => import("@/app/components/map/umkm-marker-layer").then((mod) => mod.UmkmMarkerLayer),
   { ssr: false },
 );
 const MapControls = dynamic(
@@ -178,16 +183,17 @@ export default function DiscoveryMap() {
           className={
             mapExpanded
               ? "fixed inset-4 z-50 flex flex-col rounded-[12px] bg-neutral-0 p-2 shadow-2xl"
-              : "relative flex-1 overflow-clip rounded-[12px]"
+              : "relative flex-1 overflow-clip rounded-[12px] lg:sticky lg:top-6"
           }
         >
           {!isGridLoading && (
             <LeafletMap
-              className={`w-full rounded-[12px] ${mapExpanded ? "h-full flex-1" : "h-[600px]"}`}
+              className={`w-full rounded-[12px] ${mapExpanded ? "h-full flex-1" : "h-[min(70vh,600px)] min-h-[420px]"}`}
               onClick={selectMapPoint}
               flyTo={selected ? { lat: selected.latitude, lng: selected.longitude, zoom: 16 } : null}
             >
               <GeoJsonLayer data={grid} modelAccuracy={modelAccuracy} />
+              <UmkmMarkerLayer rows={candidates?.rows ?? []} selectedId={selectedId} onSelect={selectUmkm} />
               {currentLocation && (
                 <CurrentLocationMarker lat={currentLocation.lat} lng={currentLocation.lng} />
               )}
@@ -280,7 +286,7 @@ export default function DiscoveryMap() {
                       <dd className="inline">{zone.matching_score.toFixed(1)}</dd>
                     </div>
                   </dl>
-                  {zone.narrative && <p className="mt-1 text-b9 text-neutral-600">{zone.narrative}</p>}
+                  {zone.narrative && <NarrativeBlock text={zone.narrative} className="mt-1" />}
                   {zone.ews_code > 0 && (
                     <Button
                       size="sm"

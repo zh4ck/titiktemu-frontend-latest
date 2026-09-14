@@ -294,3 +294,45 @@
     @apply font-sans;
   }
 }
+
+/* "You are here" / reallocation-destination pulse marker (used by
+   CurrentLocationMarker and ReallocationLayer via a Leaflet divIcon --
+   plain CSS keyframes since SVG CircleMarker can't animate radius/opacity
+   as cheaply as a plain HTML div can). */
+@keyframes titiktemu-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.65;
+  }
+  70% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.titiktemu-pulse-marker {
+  position: relative;
+  width: 18px;
+  height: 18px;
+}
+
+.titiktemu-pulse-marker .pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: var(--pulse-color, #dc2626);
+  animation: titiktemu-pulse 1.8s cubic-bezier(0.2, 0.7, 0.4, 1) infinite;
+}
+
+.titiktemu-pulse-marker .pulse-dot {
+  position: absolute;
+  inset: 4px;
+  border-radius: 9999px;
+  background: var(--pulse-color, #dc2626);
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}

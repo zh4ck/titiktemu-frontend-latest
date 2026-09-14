@@ -95,16 +95,19 @@ export default function TenantMatching() {
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
 
-  // Only zone_label !== "aman" businesses are actually eligible for
-  // reallocation (see reallocation.eligible below) -- filtering the picker
-  // to those up front avoids letting someone pick a business that can never
-  // produce candidates.
+  // Only "bahaya" businesses are actually eligible for reallocation -- the
+  // backend's /api/reallocation only ever populates candidates when
+  // ews_code === 2 (see getReallocationForLocation in titiktemu-backend),
+  // returning an empty candidate list with an explanatory message for
+  // "waspada" zones instead. Filtering the picker to bahaya-only up front
+  // (previously `!== "aman"`, which let waspada through too) keeps this
+  // list consistent with what will actually produce candidates below.
   const { data: umkmResult, isLoading: isUmkmListLoading } = useUmkm({
     search: search || undefined,
     limit: 20,
   });
   const eligibleUmkm = useMemo(
-    () => (umkmResult?.rows ?? []).filter((u) => u.zone_label !== "aman"),
+    () => (umkmResult?.rows ?? []).filter((u) => u.zone_label === "bahaya"),
     [umkmResult],
   );
   const selectedUmkm = useMemo(
@@ -246,13 +249,13 @@ export default function TenantMatching() {
                         <span className="min-w-0">
                           {/* ReallocationCandidate carries no UMKM name/category (these
                               rows describe destination ZONES, not tenant businesses) --
-                              recommended_grid_id/district stand in as the real
-                              identifying label instead of a fabricated business name. */}
+                              recommended_district stands in as the real, human-friendly
+                              identifying label; grid id is shown as a secondary detail. */}
                           <span className="block truncate text-fig-sh6 text-neutral-900">
-                            #{candidate.rank} {candidate.recommended_grid_id}
+                            #{candidate.rank} {candidate.recommended_district ?? `Grid ${candidate.recommended_grid_id}`}
                           </span>
                           <span className="block truncate text-b7 text-neutral-400">
-                            {candidate.recommended_district ?? "Kawasan tidak diketahui"}
+                            Grid {candidate.recommended_grid_id}
                             {candidate.crossed_district ? " • Lintas kawasan" : ""}
                           </span>
                         </span>

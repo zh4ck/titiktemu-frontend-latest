@@ -16,6 +16,7 @@ import { useZoneLookup } from "@/app/hooks/use-zone-lookup";
 import { useUmkm } from "@/app/hooks/use-umkm";
 import { useDashboardSummary } from "@/app/hooks/use-dashboard-summary";
 import { usePolicy } from "@/app/hooks/use-policy";
+import { NarrativeBlock } from "@/app/components/modules/narrative-block";
 import type { ZoneLabel } from "@/app/types/zones";
 import type { UmkmBusiness } from "@/app/types/umkm";
 
@@ -68,8 +69,12 @@ export default function Home() {
 
   const { data: grid, isLoading: isGridLoading } = useGrid();
   const { data: modelAccuracy } = useModelAccuracy();
-  const { location: currentLocation } = useCurrentLocation();
+  const { location: currentLocation, status: locationStatus } = useCurrentLocation();
   const { data: zone, isLoading: isZoneLoading } = useZoneLookup(clickedLocation);
+  // The user's OWN zone (from their real geolocated position), used to
+  // surface a "Lihat Realokasi" prompt for UMKM users sitting in a bahaya
+  // zone -- distinct from `zone`, which is whatever the user last clicked.
+  const { data: ownZone } = useZoneLookup(mode === "umkm" ? currentLocation : null);
 
   const { data: umkmResult, isLoading: isUmkmLoading } = useUmkm({
     search: search || undefined,
@@ -108,8 +113,21 @@ export default function Home() {
         </div>
       </header>
 
+      {mode === "umkm" && locationStatus === "denied" && (
+        <div className="flex items-center gap-2 rounded-lg border border-behavior-yellow-20/40 bg-behavior-yellow-10 px-4 py-2 text-b9 text-behavior-yellow-30">
+          Akses lokasi ditolak -- aktifkan izin lokasi di pengaturan browser Anda agar posisi Anda dan
+          rekomendasi realokasi terdekat dapat ditampilkan di peta.
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="relative max-h-[768px] flex-1 overflow-hidden rounded-xl">
+        {/* Fixed viewport-relative height (not max-h+flex-1) so the map has
+            a real, non-zero height on mobile/tablet where this row becomes
+            flex-col -- flex-1 alone collapses to 0px without an explicit
+            cross-axis height from a sibling. lg:sticky keeps the map in
+            view while the info panel beside it scrolls, instead of it
+            scrolling away with the rest of the page. */}
+        <div className="relative h-[min(70vh,768px)] min-h-[420px] w-full flex-1 overflow-hidden rounded-xl lg:sticky lg:top-6 lg:h-[calc(100vh-8rem)]">
           {!isGridLoading && (
             <LeafletMap
               className="h-full w-full rounded-xl"
@@ -133,6 +151,22 @@ export default function Home() {
           <aside className="flex w-95 shrink-0 flex-col gap-7 bg-neutral-0 pt-2 pb-6 px-4">
             <h2 className="text-fig-h5 text-neutral-900">Panel Informasi</h2>
             <div className="h-px w-full shrink-0 bg-neutral-200" />
+
+            {ownZone && ownZone.ews_code === 2 && (
+              <div className="flex shrink-0 flex-col gap-2 rounded-xl border border-behavior-red-20/30 bg-behavior-red-10 p-4">
+                <p className="text-fig-sh7 text-behavior-red-30">Lokasi Anda berada di zona bahaya</p>
+                <p className="text-b9 text-neutral-700">
+                  {ownZone.district_name ?? `Grid ${ownZone.grid_id}`} terindikasi berisiko tinggi tergusur.
+                  Lihat rekomendasi lokasi realokasi terdekat.
+                </p>
+                <Link
+                  href="/reallocation/"
+                  className="mt-1 w-fit rounded-lg bg-behavior-red-20 px-4 py-2 text-fig-sh8 text-neutral-0 transition-opacity hover:opacity-90"
+                >
+                  Lihat Realokasi
+                </Link>
+              </div>
+            )}
 
             {summary && (
               <div className="flex shrink-0 flex-col gap-3">
@@ -204,7 +238,7 @@ export default function Home() {
                           {RECOMMENDATION_LABEL[item.recommendation_type] ?? item.recommendation_type}
                         </span>
                       </div>
-                      <p className="text-b7 text-neutral-900">{item.narrative}</p>
+                      <NarrativeBlock text={item.narrative} className="mt-1" />
                     </div>
                   );
                 })}
@@ -286,7 +320,7 @@ export default function Home() {
                           {RECOMMENDATION_LABEL[item.recommendation_type] ?? item.recommendation_type}
                         </span>
                       </div>
-                      <p className="text-b7 text-neutral-900">{item.narrative}</p>
+                      <NarrativeBlock text={item.narrative} className="mt-1" />
                     </div>
                   );
                 })}
