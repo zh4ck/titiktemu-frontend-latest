@@ -22,7 +22,7 @@ export function ConfidenceBadge({ modelAccuracy }: { modelAccuracy: ModelAccurac
         `As of the last analytics batch run (${new Date(modelAccuracy.computed_at).toLocaleString()}).`
       }
     >
-      {modelAccuracy.accuracy_pct.toFixed(1)}% (n={modelAccuracy.n}) -- {CONFIDENCE_LABEL[modelAccuracy.confidence_level]}
+      {modelAccuracy.accuracy_pct.toFixed(1)}% -- {CONFIDENCE_LABEL[modelAccuracy.confidence_level]}
     </Badge>
   );
 }

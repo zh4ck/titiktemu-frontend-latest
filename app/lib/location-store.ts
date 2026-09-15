@@ -6,12 +6,20 @@ type LocationState = {
   location: { lat: number; lng: number } | null;
   status: LocationStatus;
   watchId: number | null;
+  /** Set once a UMKM user submits a real business location (the
+   * Self-Tracker form) -- takes priority over the raw browser geolocation
+   * everywhere `useCurrentLocation()` is read, so the map immediately
+   * reflects "where my business actually is" instead of wherever the
+   * device's GPS happens to be (which may be inaccurate/unavailable, or
+   * simply not where the submitted business sits). */
+  override: { lat: number; lng: number } | null;
   /** Idempotent -- safe to call from every page/component that needs the
    * user's location; only the first caller actually starts a
    * geolocation watch, so the browser's permission prompt fires once and
    * every consumer shares the same coordinate instead of each page running
    * its own independent watchPosition(). */
   start: () => void;
+  setOverride: (location: { lat: number; lng: number }) => void;
 };
 
 /**
@@ -26,6 +34,8 @@ export const useLocationStore = create<LocationState>((set, get) => ({
   location: null,
   status: typeof navigator !== "undefined" && navigator.geolocation ? "idle" : "unsupported",
   watchId: null,
+  override: null,
+  setOverride: (location) => set({ override: location }),
   start: () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return;
     if (get().watchId !== null) return;

@@ -4,6 +4,7 @@ import { CircleMarker, Marker, Polyline, Popup } from "react-leaflet";
 import { ConfidenceBadge } from "@/app/components/ui/confidence-badge";
 import { centroidOf } from "@/app/lib/geo";
 import { pulseIcon } from "@/app/lib/pulse-icon";
+import { regionLabel } from "@/app/lib/format";
 import type { ModelAccuracy, ReallocationCandidate } from "@/app/types/zones";
 
 export { centroidOf };
@@ -13,7 +14,7 @@ const TOP_CANDIDATE_COLOR = "#39b332"; // matches EWS "aman" green -- the destin
 /** Human-friendly label for a candidate: region name first, grid id as a
  * secondary/technical detail rather than the primary identifier. */
 function candidateLabel(candidate: ReallocationCandidate): string {
-  return candidate.recommended_district ?? `Grid ${candidate.recommended_grid_id}`;
+  return regionLabel(candidate.recommended_district);
 }
 
 export function ReallocationLayer({

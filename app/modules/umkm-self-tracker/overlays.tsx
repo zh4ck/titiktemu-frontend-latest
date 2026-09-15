@@ -14,6 +14,7 @@
 
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Mail, X } from "lucide-react";
+import { regionLabel } from "@/app/lib/format";
 import type { UmkmBusiness } from "@/app/types/umkm";
 import type { ZoneLabel } from "@/app/types/zones";
 
@@ -101,9 +102,7 @@ export function DetailUsahaOverlay({
             </div>
             <div className="flex flex-col gap-1">
               <dt className="text-b8 text-neutral-600">Lokasi</dt>
-              <dd className="text-b7 text-neutral-900">
-                {umkm.district_name ?? "-"} ({umkm.grid_id})
-              </dd>
+              <dd className="text-b7 text-neutral-900">{regionLabel(umkm.district_name)}</dd>
             </div>
             <div className="flex flex-col gap-1">
               <dt className="text-b8 text-neutral-600">Jarak ke stasiun</dt>

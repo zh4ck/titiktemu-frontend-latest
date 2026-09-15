@@ -8,6 +8,7 @@ import { Skeleton } from "@/app/components/ui/skeleton";
 import { useGrid } from "@/app/hooks/use-grid";
 import { useUmkm } from "@/app/hooks/use-umkm";
 import { useAuth } from "@/app/lib/auth";
+import { regionLabel } from "@/app/lib/format";
 import type { UmkmBusiness } from "@/app/types/umkm";
 import {
   ApproveConfirmOverlay,
@@ -137,7 +138,7 @@ function UMKMSelfTrackerOperatorView() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6">
+    <div className="flex h-full flex-col gap-4 overflow-y-auto p-6">
       <header>
         <h1 className="text-h6 font-semibold text-secondary-800">UMKM Self-Tracker</h1>
         <p className="text-b8 text-neutral-600">
@@ -235,7 +236,7 @@ function UMKMSelfTrackerOperatorView() {
             <tr>
               <th className="p-3 font-semibold text-neutral-700">Nama Usaha</th>
               <th className="p-3 font-semibold text-neutral-700">Kategori</th>
-              <th className="p-3 font-semibold text-neutral-700">Blok / Grid ID</th>
+              <th className="p-3 font-semibold text-neutral-700">Kawasan</th>
               <th className="p-3 font-semibold text-neutral-700">Status</th>
               <th className="p-3 font-semibold text-neutral-700">Indeks Kerentanan</th>
               <th className="p-3 font-semibold text-neutral-700">Keyakinan</th>
@@ -263,9 +264,7 @@ function UMKMSelfTrackerOperatorView() {
                 <tr key={umkm.id} className="border-b border-border last:border-0 hover:bg-neutral-50">
                   <td className="p-3 font-medium text-neutral-900">{umkm.name ?? "-"}</td>
                   <td className="p-3 text-neutral-600">{umkm.category ?? "-"}</td>
-                  <td className="p-3 text-neutral-600">
-                    {umkm.district_name ?? "-"} &middot; {umkm.grid_id}
-                  </td>
+                  <td className="p-3 text-neutral-600">{regionLabel(umkm.district_name)}</td>
                   <td className="p-3">
                     {umkm.zone_label ? (
                       <StatusPill label={umkm.zone_label.toUpperCase()} variant={umkm.zone_label} />

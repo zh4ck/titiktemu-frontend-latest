@@ -54,14 +54,18 @@ export function AiPanel({ role, onHighlightGridIds }: {
 
   if (!isOpen) {
     return (
-      <aside aria-label="In-map AI panel" className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000]">
+      // Bottom-right, stuck to the map's own corner -- previously centered
+      // at the bottom, where it could overlap MapLegend (bottom-left).
+      // Anchoring both to opposite corners keeps them out of each other's
+      // way on every page that renders both inside the same map wrapper.
+      <aside aria-label="In-map AI panel" className="absolute bottom-3 right-3 z-[1000]">
         <button
           type="button"
           onClick={() => setIsOpen(true)}
           className="flex h-10 items-center gap-2 rounded-full border border-border bg-neutral-0 px-4 text-s8 font-semibold text-neutral-900 shadow-sm transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <span className="size-2 shrink-0 rounded-full bg-secondary-500" aria-hidden="true" />
-          Asisten AI TitikTemu
+          <span className="hidden sm:inline">Asisten AI TitikTemu</span>
         </button>
       </aside>
     );
@@ -70,7 +74,7 @@ export function AiPanel({ role, onHighlightGridIds }: {
   return (
     <aside
       aria-label="In-map AI panel"
-      className="absolute bottom-4 left-1/2 z-[1000] flex h-[420px] w-[92vw] max-w-sm -translate-x-1/2 flex-col overflow-hidden rounded-xl border border-border bg-neutral-0 shadow-sm"
+      className="absolute bottom-3 right-3 z-[1000] flex h-[420px] w-[92vw] max-w-sm max-h-[70%] flex-col overflow-hidden rounded-xl border border-border bg-neutral-0 shadow-sm"
     >
       <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">

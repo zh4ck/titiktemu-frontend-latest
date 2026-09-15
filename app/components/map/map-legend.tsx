@@ -10,7 +10,11 @@ const ITEMS = [
 
 export function MapLegend({ caption }: { caption?: string }) {
   return (
-    <div className="absolute bottom-3 left-3 z-[900] flex max-w-xs flex-col gap-2 rounded-lg border border-neutral-200 bg-neutral-100/95 px-3 py-2 shadow-sm backdrop-blur-sm">
+    // bottom-2 (not bottom-3) so it hugs the map's own edge; capped width
+    // shrinks further on small viewports so it doesn't crowd out the map
+    // on mobile/tablet (it previously covered a large fraction of the map
+    // area on narrow screens).
+    <div className="absolute bottom-2 left-2 z-[900] flex max-w-[75vw] flex-col gap-2 rounded-lg border border-neutral-200 bg-neutral-100/95 px-2.5 py-1.5 shadow-sm backdrop-blur-sm sm:max-w-xs sm:px-3 sm:py-2">
       <div className="flex flex-wrap items-center gap-3 text-b9">
         {ITEMS.map((item) => (
           <span key={item.label} className="flex items-center gap-1.5">

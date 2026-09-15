@@ -2,6 +2,7 @@
 
 import { CircleMarker, Popup, Tooltip } from "react-leaflet";
 import { centroidOf } from "@/app/lib/geo";
+import { regionLabel } from "@/app/lib/format";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/app/lib/confidence";
 import type { ModelAccuracy, ZoneFeature, ZoneFeatureCollection } from "@/app/types/zones";
 
@@ -51,16 +52,15 @@ function AccuracyBadge({ modelAccuracy }: { modelAccuracy?: ModelAccuracy | null
   );
 }
 
-/** Human-friendly popup: region name leads, grid id is a secondary/technical
- * detail rather than the primary identifier a user has to parse. */
+/** Human-friendly popup: region name only -- grid_id is an internal
+ * modeling identifier, never shown to the user (see app/lib/format.ts). */
 function ZonePopup({ feature, modelAccuracy }: { feature: ZoneFeature; modelAccuracy?: ModelAccuracy | null }) {
-  const { grid_id, district_name, kecamatan, ews_code, matching_score } = feature.properties;
-  const title = district_name ?? kecamatan ?? `Zona ${grid_id}`;
+  const { district_name, kecamatan, ews_code, matching_score } = feature.properties;
+  const title = district_name ?? kecamatan ?? "Zona tidak diketahui";
   const statusLabel = ews_code !== null && ews_code !== undefined ? EWS_TO_LABEL[ews_code] : "-";
   return (
     <div className="flex flex-col gap-0.5">
       <strong>{title}</strong>
-      <span className="text-[11px] text-neutral-500">Grid {grid_id}</span>
       <span>Status: {statusLabel}</span>
       <span>Matching score: {matching_score?.toFixed(1) ?? "-"}</span>
       <AccuracyBadge modelAccuracy={modelAccuracy} />
@@ -89,7 +89,7 @@ export function GeoJsonLayer({
         if (!ring) return null;
         const centroid = centroidOf(ring);
         const color = EWS_TO_HEX[ewsCode];
-        const label = feature.properties.district_name ?? `Grid ${feature.properties.grid_id}`;
+        const label = regionLabel(feature.properties.district_name);
 
         return (
           <CircleMarker

@@ -8,7 +8,9 @@
 // app/hooks/use-reallocation-requests.ts -- a separate resource from the
 // existing read-only "Laporan Alokasi" policy-recommendations page).
 
+import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Badge } from "@/app/components/ui/badge";
 import { ConfidenceBadge } from "@/app/components/ui/confidence-badge";
@@ -18,6 +20,7 @@ import { useCurrentLocation } from "@/app/hooks/use-current-location";
 import { useReallocation } from "@/app/hooks/use-reallocation";
 import { useSubmitReallocationRequest } from "@/app/hooks/use-reallocation-requests";
 import { useZoneLookup } from "@/app/hooks/use-zone-lookup";
+import { regionLabel } from "@/app/lib/format";
 import type { ReallocationCandidate, ZoneLabel } from "@/app/types/zones";
 
 const LeafletMap = dynamic(
@@ -36,10 +39,11 @@ const ZONE_BADGE_VARIANT: Record<ZoneLabel, "secondary" | "default" | "primary">
 };
 
 function candidateLabel(candidate: ReallocationCandidate): string {
-  return candidate.recommended_district ?? `Grid ${candidate.recommended_grid_id}`;
+  return regionLabel(candidate.recommended_district);
 }
 
 export default function ReallocationView() {
+  const searchParams = useSearchParams();
   const { location, status: locationStatus } = useCurrentLocation();
   const { data: zone, isLoading: isZoneLoading } = useZoneLookup(location);
   const isEligibleForLookup = !!zone && zone.ews_code === 2;
@@ -48,7 +52,12 @@ export default function ReallocationView() {
     isEligibleForLookup,
   );
 
-  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  // Deep-linked from a specific card (e.g. Beranda's Rekomendasi Alokasi
+  // "Lihat Realokasi" button) -- pre-selects that candidate instead of
+  // defaulting to rank 1.
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(
+    () => searchParams.get("candidate"),
+  );
   const [note, setNote] = useState("");
   const submitRequest = useSubmitReallocationRequest();
 
@@ -73,7 +82,7 @@ export default function ReallocationView() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-4 p-6">
+    <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 overflow-y-auto p-6">
       <header>
         <h1 className="text-fig-sh4 text-primary-teal-70">Lihat Realokasi</h1>
         <p className="text-b7 text-neutral-600">
@@ -101,7 +110,15 @@ export default function ReallocationView() {
       {isZoneLoading && <Skeleton className="h-10 w-full" />}
 
       {location && !isZoneLoading && !zone && (
-        <p className="text-b8 text-neutral-600">Lokasi Anda berada di luar area studi.</p>
+        <div className="flex flex-col items-start gap-2 rounded-lg border border-neutral-300 bg-neutral-50 p-4">
+          <p className="text-b8 text-neutral-600">
+            Lokasi Anda saat ini berada di luar area studi TitikTemu, sehingga rekomendasi realokasi tidak
+            tersedia untuk posisi ini.
+          </p>
+          <Link href="/beranda/" className="text-b9 font-semibold text-primary-teal-70 hover:underline">
+            Kembali ke Beranda
+          </Link>
+        </div>
       )}
 
       {zone && (
@@ -110,9 +127,7 @@ export default function ReallocationView() {
             {zone.zone_label.toUpperCase()}
           </Badge>
           <ConfidenceBadge modelAccuracy={zone.model_accuracy} />
-          <span className="text-b8 text-neutral-600">
-            Anda berada di {zone.district_name ?? `Grid ${zone.grid_id}`}
-          </span>
+          <span className="text-b8 text-neutral-600">Anda berada di {regionLabel(zone.district_name)}</span>
         </div>
       )}
 

@@ -91,7 +91,7 @@ export default function EsgDashboard() {
   }, [historyQuery]);
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-fig-sh4 text-primary-teal-70">ESG Dashboard</h1>
         <p className="text-b7 text-neutral-900">
@@ -158,12 +158,12 @@ export default function EsgDashboard() {
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="flex flex-col gap-1">
                   <h2 className="text-fig-sh6 text-neutral-900">
-                    Distribusi Tingkat Perhatian per Blok
+                    Distribusi Tingkat Perhatian per Kawasan
                   </h2>
                   {summary.ews_validation_accuracy_pct !== null && (
                     <p className="text-b9 text-neutral-500">
-                      Akurasi model tervalidasi: {summary.ews_validation_accuracy_pct}% (n=
-                      {summary.ews_validation_n}, keyakinan {summary.confidence_level})
+                      Akurasi model tervalidasi: {summary.ews_validation_accuracy_pct}% (keyakinan{" "}
+                      {summary.confidence_level})
                     </p>
                   )}
                 </div>
@@ -181,23 +181,38 @@ export default function EsgDashboard() {
               <div className="flex flex-col gap-10">
                 {districts.length > 0 ? (
                   <div className="h-80">
+                    {/* Chart previously always rendered ALL districts regardless of
+                        the dropdown above -- the dropdown only filtered the summary
+                        numbers below. Now the chart itself narrows to the selected
+                        district (a single bar) and clicking any bar in the "all
+                        districts" view drills into it, syncing back to the dropdown --
+                        selectedDistrict is the single source of truth either way. */}
                     <Bar
                       data={{
-                        labels: districts.map(([name]) => name),
+                        labels: selectedDistrict === "all" ? districts.map(([name]) => name) : [selectedDistrict],
                         datasets: [
                           {
                             label: "Relatif Aman",
-                            data: districts.map(([, d]) => d.safe),
+                            data:
+                              selectedDistrict === "all"
+                                ? districts.map(([, d]) => d.safe)
+                                : [distribution.safe],
                             backgroundColor: COLORS.aman,
                           },
                           {
                             label: "Butuh Perhatian",
-                            data: districts.map(([, d]) => d.moderate),
+                            data:
+                              selectedDistrict === "all"
+                                ? districts.map(([, d]) => d.moderate)
+                                : [distribution.moderate],
                             backgroundColor: COLORS.waspada,
                           },
                           {
                             label: "Perlu Dipantau",
-                            data: districts.map(([, d]) => d.danger),
+                            data:
+                              selectedDistrict === "all"
+                                ? districts.map(([, d]) => d.danger)
+                                : [distribution.danger],
                             backgroundColor: COLORS.bahaya,
                           },
                         ],
@@ -205,13 +220,42 @@ export default function EsgDashboard() {
                       options={{
                         responsive: true,
                         maintainAspectRatio: false,
-                        scales: { x: { stacked: false }, y: { beginAtZero: true } },
-                        plugins: { legend: { position: "bottom" } },
+                        animation: { duration: 300 },
+                        scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { precision: 0 } } },
+                        plugins: {
+                          legend: { position: "bottom" },
+                          tooltip: {
+                            callbacks: {
+                              footer: () =>
+                                selectedDistrict === "all" ? "Klik batang untuk fokus ke kawasan ini" : undefined,
+                            },
+                          },
+                        },
+                        onHover: (event, elements) => {
+                          if (event.native?.target instanceof HTMLElement) {
+                            event.native.target.style.cursor =
+                              selectedDistrict === "all" && elements.length > 0 ? "pointer" : "default";
+                          }
+                        },
+                        onClick: (_event, elements) => {
+                          if (selectedDistrict !== "all" || elements.length === 0) return;
+                          const clickedDistrict = districts[elements[0].index]?.[0];
+                          if (clickedDistrict) setSelectedDistrict(clickedDistrict);
+                        },
                       }}
                     />
                   </div>
                 ) : (
                   <p className="text-b9 text-neutral-500">Belum ada data kawasan.</p>
+                )}
+                {selectedDistrict !== "all" && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDistrict("all")}
+                    className="-mt-6 w-fit text-b9 font-semibold text-primary-teal-70 hover:underline"
+                  >
+                    &larr; Kembali ke semua kawasan
+                  </button>
                 )}
 
                 {/* "Ringkasan Kawasan" (Kawasan/Radius/Periode/Jumlah Zona) from

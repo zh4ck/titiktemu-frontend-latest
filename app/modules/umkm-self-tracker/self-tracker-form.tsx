@@ -17,6 +17,7 @@
 import { useMemo, useState } from "react";
 import {
   Alert,
+  AlertAction,
   AlertClose,
   AlertDescription,
   AlertIcon,
@@ -28,7 +29,20 @@ import { FileInput } from "@/app/components/ui/file-input";
 import { CheckCircle2, Info, LocateFixed, XCircle } from "lucide-react";
 import { useCurrentLocation } from "@/app/hooks/use-current-location";
 import { useSubmitSelfReport } from "@/app/hooks/use-self-reports";
+import { useZoneLookup } from "@/app/hooks/use-zone-lookup";
+import { useDashboardSummary } from "@/app/hooks/use-dashboard-summary";
+import { useLocationStore } from "@/app/lib/location-store";
+import { regionLabel } from "@/app/lib/format";
+import { ConfidenceBadge } from "@/app/components/ui/confidence-badge";
+import { Badge } from "@/app/components/ui/badge";
 import type { RentPeriodUnit, TenantType } from "@/app/types/self-report";
+import type { ZoneLabel } from "@/app/types/zones";
+
+const ZONE_BADGE_VARIANT: Record<ZoneLabel, "secondary" | "default" | "primary"> = {
+  aman: "secondary",
+  waspada: "default",
+  bahaya: "primary",
+};
 
 const STORAGE_PREFIX = "titiktemu:umkm-self-tracker:";
 const FORM_KEY = `${STORAGE_PREFIX}form`;
@@ -254,6 +268,24 @@ export default function UmkmSelfTrackerForm() {
   const [banner, setBanner] = useState<BannerState>(null);
   const { location: currentLocation, status: locationStatus } = useCurrentLocation();
   const submitSelfReport = useSubmitSelfReport();
+  const setLocationOverride = useLocationStore((s) => s.setOverride);
+
+  // Once a business location has actually been submitted, that's the real
+  // "informative dashboard" location -- not necessarily the form's current
+  // (possibly still-being-edited) draft values. Persisted via `form` itself
+  // (loadForm/saveForm already round-trip latitude/longitude), so it
+  // survives reloads.
+  const submittedLocation = useMemo(() => {
+    const lat = toNumberOrUndefined(form.latitude);
+    const lng = toNumberOrUndefined(form.longitude);
+    return lat !== undefined && lng !== undefined ? { lat, lng } : null;
+  }, [form.latitude, form.longitude]);
+  const hasSubmitted = status === "pending" || status === "approved" || status === "rejected";
+  const { data: submittedZone, isLoading: isSubmittedZoneLoading } = useZoneLookup(
+    hasSubmitted ? submittedLocation : null,
+  );
+  const { data: summary } = useDashboardSummary();
+  const districtStats = submittedZone?.district_name ? summary?.by_district[submittedZone.district_name] : undefined;
 
   function pushHistory(action: string) {
     setHistory((prev) => {
@@ -330,6 +362,11 @@ export default function UmkmSelfTrackerForm() {
           setStatus("pending");
           saveStatus("pending");
           pushHistory("Formulir diajukan");
+          // The submitted business location becomes "where I am" across the
+          // app (Beranda's map, etc.) -- it's a real, deliberately-entered
+          // coordinate, a better signal than raw device GPS for "where is
+          // this user's business."
+          setLocationOverride({ lat, lng });
           setBanner({
             variant: "info",
             title: "Pengajuan Terkirim",
@@ -375,7 +412,7 @@ export default function UmkmSelfTrackerForm() {
   const lastUpdate = history[0]?.timestamp;
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
+    <div className="mx-auto flex h-full max-w-3xl flex-col gap-6 overflow-y-auto p-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-fig-sh4 text-neutral-900">UMKM Self-Tracker</h1>
         <p className="text-b7 text-neutral-600">
@@ -392,7 +429,9 @@ export default function UmkmSelfTrackerForm() {
           </AlertIcon>
           <AlertTitle>{banner.title}</AlertTitle>
           <AlertDescription>{banner.description}</AlertDescription>
-          <AlertClose onClick={() => setBanner(null)} />
+          <AlertAction>
+            <AlertClose onClick={() => setBanner(null)} />
+          </AlertAction>
         </Alert>
       )}
 
@@ -647,6 +686,71 @@ export default function UmkmSelfTrackerForm() {
           </div>
         )}
       </section>
+
+      {/* Once the form has been submitted, the page stops being just an
+          editable form and starts showing real metrics for the submitted
+          location and its region -- reusing the same zone-lookup and
+          dashboard-summary data every other page already relies on, not
+          fabricated numbers. */}
+      {hasSubmitted && submittedLocation && (
+        <section className="flex flex-col gap-5 rounded-xl border border-neutral-300 bg-neutral-0 p-6">
+          <h2 className="text-fig-sh7 text-neutral-900">Dashboard Usaha Anda</h2>
+
+          {isSubmittedZoneLoading && (
+            <div className="flex flex-col gap-2">
+              <div className="h-4 w-1/3 animate-pulse rounded bg-neutral-200" />
+              <div className="h-4 w-1/2 animate-pulse rounded bg-neutral-200" />
+            </div>
+          )}
+
+          {!isSubmittedZoneLoading && !submittedZone && (
+            <p className="text-b8 text-neutral-500">
+              Lokasi usaha Anda berada di luar area studi TitikTemu, sehingga metrik zona belum tersedia.
+            </p>
+          )}
+
+          {submittedZone && (
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge variant={ZONE_BADGE_VARIANT[submittedZone.zone_label]} selectable={false}>
+                  {submittedZone.zone_label.toUpperCase()}
+                </Badge>
+                <ConfidenceBadge modelAccuracy={submittedZone.model_accuracy} />
+                <span className="text-b8 text-neutral-600">{regionLabel(submittedZone.district_name)}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-xl border border-neutral-200 p-3">
+                  <p className="text-b9 text-neutral-500">Indeks Kerentanan</p>
+                  <p className="text-fig-sh6 text-neutral-900">
+                    {submittedZone.vulnerability_index.toFixed(3)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-neutral-200 p-3">
+                  <p className="text-b9 text-neutral-500">Matching Score</p>
+                  <p className="text-fig-sh6 text-neutral-900">{submittedZone.matching_score.toFixed(1)}</p>
+                </div>
+                {districtStats && (
+                  <>
+                    <div className="rounded-xl border border-neutral-200 p-3">
+                      <p className="text-b9 text-neutral-500">Zona Bahaya di Kawasan</p>
+                      <p className="text-fig-sh6 text-behavior-red-30">{districtStats.danger}</p>
+                    </div>
+                    <div className="rounded-xl border border-neutral-200 p-3">
+                      <p className="text-b9 text-neutral-500">Zona Aman di Kawasan</p>
+                      <p className="text-fig-sh6 text-behavior-green-30">{districtStats.safe}</p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {submittedZone.narrative && (
+                <p className="whitespace-pre-line text-b8 text-neutral-700">{submittedZone.narrative}</p>
+              )}
+            </>
+          )}
+        </section>
+      )}
 
       {showStatusPanel && (
         <section

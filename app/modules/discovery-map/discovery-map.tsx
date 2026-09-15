@@ -136,8 +136,8 @@ export default function DiscoveryMap() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="flex h-full flex-col gap-4 p-6">
+      <div className="shrink-0 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-sans text-[30px] text-primary-teal-70">Discovery Map</h1>
           <p className="text-[16px] text-neutral-900">
@@ -154,7 +154,7 @@ export default function DiscoveryMap() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="shrink-0 flex flex-wrap gap-2">
         {FILTERS.map((filter) => (
           <Badge
             key={filter.label}
@@ -172,23 +172,27 @@ export default function DiscoveryMap() {
       </div>
 
       {isGridError && (
-        <p className="text-b8 text-destructive">
+        <p className="shrink-0 text-b8 text-destructive">
           Tidak dapat memuat peta zona -- pastikan backend berjalan di{" "}
           {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}.
         </p>
       )}
 
-      <div className="flex flex-col gap-4 lg:flex-row">
+      {/* flex-1 min-h-0 fills exactly the remaining viewport height (see
+          app/(app)/layout.tsx) -- the map never moves as the page scrolls
+          because the page itself doesn't scroll; only the candidate list
+          in the aside does. */}
+      <div className="flex flex-1 min-h-0 flex-col gap-4 lg:flex-row">
         <div
           className={
             mapExpanded
               ? "fixed inset-4 z-50 flex flex-col rounded-[12px] bg-neutral-0 p-2 shadow-2xl"
-              : "relative flex-1 overflow-clip rounded-[12px] lg:sticky lg:top-6"
+              : "relative h-[min(70vh,600px)] w-full shrink-0 overflow-clip rounded-[12px] lg:h-full lg:flex-1"
           }
         >
           {!isGridLoading && (
             <LeafletMap
-              className={`w-full rounded-[12px] ${mapExpanded ? "h-full flex-1" : "h-[min(70vh,600px)] min-h-[420px]"}`}
+              className={`w-full rounded-[12px] ${mapExpanded ? "h-full flex-1" : "h-full"}`}
               onClick={selectMapPoint}
               flyTo={selected ? { lat: selected.latitude, lng: selected.longitude, zoom: 16 } : null}
             >
@@ -204,7 +208,7 @@ export default function DiscoveryMap() {
           <AiPanel role="operator" />
         </div>
 
-        <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-80">
+        <aside className="flex w-full shrink-0 flex-col gap-3 overflow-y-auto lg:w-80">
           <div className="flex items-center justify-between">
             <h2 className="text-s6 font-semibold text-neutral-900">
               {FILTERS.find((f) => f.ews === ewsFilter)?.label} ({candidates?.total ?? 0})
@@ -241,7 +245,7 @@ export default function DiscoveryMap() {
                     <p className="text-[16px] font-semibold text-black">{row.name ?? "-"}</p>
                     <p className="text-b9 text-neutral-600">
                       {row.dist_to_station_m !== null ? `${Math.round(row.dist_to_station_m)}m` : "-"} &middot;{" "}
-                      {row.district_name} &middot; Blok {row.grid_id}
+                      {row.district_name ?? "Kawasan tidak diketahui"}
                     </p>
                   </div>
                   {row.zone_label && (
@@ -270,12 +274,8 @@ export default function DiscoveryMap() {
                   </div>
                   <dl className="flex flex-col gap-1 text-b8">
                     <div>
-                      <dt className="inline font-semibold">Blok: </dt>
-                      <dd className="inline">{zone.grid_id}</dd>
-                    </div>
-                    <div>
                       <dt className="inline font-semibold">Kawasan: </dt>
-                      <dd className="inline">{zone.district_name ?? "-"}</dd>
+                      <dd className="inline">{zone.district_name ?? "Tidak diketahui"}</dd>
                     </div>
                     <div>
                       <dt className="inline font-semibold">Indeks Kerentanan: </dt>

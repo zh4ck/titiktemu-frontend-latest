@@ -27,6 +27,7 @@ import { MapLegend } from "@/app/components/map/map-legend";
 import { useReallocation } from "@/app/hooks/use-reallocation";
 import { useUmkm } from "@/app/hooks/use-umkm";
 import { useZoneLookup } from "@/app/hooks/use-zone-lookup";
+import { regionLabel } from "@/app/lib/format";
 import type { ReallocationCandidate } from "@/app/types/zones";
 
 // Bucketed label for "Kesesuaian ESG" -- there is no distinct ESG field in
@@ -52,10 +53,9 @@ function candidateStatusLabel(candidate: ReallocationCandidate): string {
     : "Dalam kawasan yang sama dengan lokasi asal";
 }
 
-// "Lokasi" built entirely from real candidate fields.
+// "Lokasi" built entirely from real candidate fields -- no grid_id exposed.
 function candidateLocationLabel(candidate: ReallocationCandidate): string {
-  const district = candidate.recommended_district ?? "Kawasan tidak diketahui";
-  return `${district} · grid ${candidate.recommended_grid_id} · ${candidate.distance_m.toFixed(0)} m dari pintu keluar stasiun`;
+  return `${regionLabel(candidate.recommended_district)} · ${candidate.distance_m.toFixed(0)} m dari pintu keluar stasiun`;
 }
 
 const LeafletMap = dynamic(
@@ -79,8 +79,6 @@ function polygonCentroid(candidate: ReallocationCandidate): { lat: number; lng: 
   return { lat: sum.lat / (ring.length || 1), lng: sum.lng / (ring.length || 1) };
 }
 
-type Decision = "diterima" | "ditolak";
-
 export default function TenantMatching() {
   const router = useRouter();
   const pathname = usePathname();
@@ -92,7 +90,6 @@ export default function TenantMatching() {
 
   const [search, setSearch] = useState("");
   const [selectedUmkmId, setSelectedUmkmId] = useState<string | null>(null);
-  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
 
   // Only "bahaya" businesses are actually eligible for reallocation -- the
@@ -140,7 +137,7 @@ export default function TenantMatching() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6">
+    <div className="flex h-full flex-col gap-4 overflow-y-auto p-6">
       <header>
         <h1 className="text-fig-sh4 text-primary-teal-70">Smart Tenant Matching</h1>
         <p className="text-b7 text-neutral-900">
@@ -180,9 +177,9 @@ export default function TenantMatching() {
                       selectedUmkmId === umkm.id ? "border-primary-500 bg-primary-50" : "border-border"
                     }`}
                   >
-                    <p className="text-b9 font-semibold text-neutral-900">{umkm.name ?? umkm.grid_id}</p>
+                    <p className="text-b9 font-semibold text-neutral-900">{umkm.name ?? regionLabel(umkm.district_name)}</p>
                     <p className="text-b9 text-neutral-500">
-                      {umkm.category} &middot; {umkm.district_name} &middot; {umkm.zone_label?.toUpperCase()}
+                      {umkm.category} &middot; {regionLabel(umkm.district_name)} &middot; {umkm.zone_label?.toUpperCase()}
                     </p>
                   </button>
                 ))}
@@ -200,7 +197,7 @@ export default function TenantMatching() {
               </Badge>
               <ConfidenceBadge modelAccuracy={zone.model_accuracy} />
               <span className="text-b8 text-neutral-600">
-                {selectedUmkm?.name ?? "Lokasi ini"} berada di {zone.grid_id} ({zone.district_name ?? "-"})
+                {selectedUmkm?.name ?? "Lokasi ini"} berada di {regionLabel(zone.district_name)}
               </span>
             </div>
           )}
@@ -250,14 +247,14 @@ export default function TenantMatching() {
                           {/* ReallocationCandidate carries no UMKM name/category (these
                               rows describe destination ZONES, not tenant businesses) --
                               recommended_district stands in as the real, human-friendly
-                              identifying label; grid id is shown as a secondary detail. */}
+                              identifying label. grid_id is an internal modeling id, never
+                              shown to the user (see app/lib/format.ts's regionLabel). */}
                           <span className="block truncate text-fig-sh6 text-neutral-900">
-                            #{candidate.rank} {candidate.recommended_district ?? `Grid ${candidate.recommended_grid_id}`}
+                            #{candidate.rank} {regionLabel(candidate.recommended_district)}
                           </span>
-                          <span className="block truncate text-b7 text-neutral-400">
-                            Grid {candidate.recommended_grid_id}
-                            {candidate.crossed_district ? " • Lintas kawasan" : ""}
-                          </span>
+                          {candidate.crossed_district && (
+                            <span className="block truncate text-b7 text-neutral-400">Lintas kawasan</span>
+                          )}
                         </span>
                         <span className="shrink-0 text-fig-sh5 text-primary-teal-70">
                           {Math.round(candidate.matching_score)}%
@@ -340,37 +337,16 @@ export default function TenantMatching() {
                     Lihat di Discovery Map
                   </Link>
 
-                  {decisions[selectedCandidate.recommended_grid_id] ? (
-                    <p className="mt-3 text-b8 font-semibold text-neutral-700">
-                      Keputusan (belum tersimpan ke sistem):{" "}
-                      {decisions[selectedCandidate.recommended_grid_id] === "diterima" ? "Diterima" : "Ditolak"}
-                    </p>
-                  ) : (
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setDecisions((d) => ({ ...d, [selectedCandidate.recommended_grid_id]: "ditolak" }))
-                        }
-                        className="flex-1 rounded-[8px] border-[1.6px] border-behavior-red-20 p-2 text-fig-sh7 text-behavior-red-20 transition-opacity hover:opacity-90"
-                      >
-                        Tolak
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setDecisions((d) => ({ ...d, [selectedCandidate.recommended_grid_id]: "diterima" }))
-                        }
-                        className="flex-1 rounded-[8px] bg-primary-teal-60 p-2 text-fig-sh7 text-white transition-opacity hover:opacity-90"
-                      >
-                        Terima
-                      </button>
-                    </div>
-                  )}
-                  <p className="mt-2 text-b9 text-neutral-500">
-                    Keputusan ini hanya tersimpan di sesi browser Anda -- belum ada alur persetujuan tersimpan
-                    di backend.
-                  </p>
+                  {/* Approve/reject moved to the "Pengajuan Realokasi Pengguna" tab
+                      on Laporan Alokasi -- that's the real, backend-persisted review
+                      queue for reallocation requests a UMKM user actually submitted.
+                      This page is for exploring candidates, not deciding on them. */}
+                  <Link
+                    href="/report-allocation/"
+                    className="mt-3 flex h-10 w-full items-center justify-center rounded-[8px] bg-primary-teal-60 text-fig-sh7 text-white transition-opacity hover:opacity-90"
+                  >
+                    Tinjau Pengajuan di Laporan Alokasi
+                  </Link>
                 </aside>
               )}
             </div>

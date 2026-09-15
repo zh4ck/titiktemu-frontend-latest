@@ -14,6 +14,7 @@ import {
 import { Skeleton } from "@/app/components/ui/skeleton";
 import { usePolicy } from "@/app/hooks/use-policy";
 import { useReallocationRequests, useReviewReallocationRequest } from "@/app/hooks/use-reallocation-requests";
+import { regionLabel } from "@/app/lib/format";
 import type { PolicyRecommendation } from "@/app/types/umkm";
 import type { ReallocationRequestStatus } from "@/app/types/reallocation-request";
 
@@ -86,7 +87,7 @@ export default function AllocationReport() {
   }, [data, search]);
 
   return (
-    <div className="flex flex-col gap-4 p-6">
+    <div className="flex h-full flex-col gap-4 overflow-y-auto p-6">
       <header className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="font-sans text-fig-sh4 text-primary-teal-70">Laporan Alokasi</h1>
@@ -160,7 +161,7 @@ export default function AllocationReport() {
           <thead>
             <tr>
               <th className="w-40 p-3 font-sans text-fig-sh7 tracking-[0.64px] text-neutral-900">
-                BLOK / GRID ID
+                KAWASAN
               </th>
               <th className="w-44 p-3 font-sans text-fig-sh7 tracking-[0.64px] text-neutral-900">
                 INDEKS KERENTANAN
@@ -196,11 +197,7 @@ export default function AllocationReport() {
             {!isLoading &&
               recommendations.map((item) => (
                 <tr key={item.grid_id} className="border-b border-neutral-200 align-top last:border-0">
-                  <td className="p-3 font-medium text-neutral-900">
-                    {item.district_name ?? "-"}
-                    <br />
-                    <span className="text-neutral-500">{item.grid_id}</span>
-                  </td>
+                  <td className="p-3 font-medium text-neutral-900">{regionLabel(item.district_name)}</td>
                   <td className="p-3">
                     <span className={`font-medium ${vulnerabilityColor(item.vulnerability_index)}`}>
                       {vulnerabilityTierLabel(item.vulnerability_index)}
@@ -232,10 +229,8 @@ export default function AllocationReport() {
           {detailItem && (
             <>
               <SheetHeader>
-                <SheetTitle>{detailItem.district_name ?? detailItem.grid_id}</SheetTitle>
-                <SheetDescription>
-                  Blok {detailItem.grid_id} &middot; {TYPE_LABEL[detailItem.recommendation_type]}
-                </SheetDescription>
+                <SheetTitle>{regionLabel(detailItem.district_name)}</SheetTitle>
+                <SheetDescription>{TYPE_LABEL[detailItem.recommendation_type]}</SheetDescription>
               </SheetHeader>
               <div className="flex flex-col gap-3 px-4 pb-4">
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-b9">
@@ -318,7 +313,6 @@ function ReallocationRequestsPanel() {
         <table className="w-full text-left text-b9">
           <thead>
             <tr>
-              <th className="p-3 font-sans text-fig-sh7 tracking-[0.64px] text-neutral-900">ASAL</th>
               <th className="p-3 font-sans text-fig-sh7 tracking-[0.64px] text-neutral-900">TUJUAN</th>
               <th className="p-3 font-sans text-fig-sh7 tracking-[0.64px] text-neutral-900">CATATAN</th>
               <th className="p-3 font-sans text-fig-sh7 tracking-[0.64px] text-neutral-900">STATUS</th>
@@ -329,14 +323,14 @@ function ReallocationRequestsPanel() {
             {isLoading &&
               Array.from({ length: 3 }).map((_, index) => (
                 <tr key={index} className="border-b border-neutral-200 last:border-0">
-                  <td className="p-3" colSpan={5}>
+                  <td className="p-3" colSpan={4}>
                     <Skeleton className="h-12 w-full" />
                   </td>
                 </tr>
               ))}
             {!isLoading && (data?.rows.length ?? 0) === 0 && (
               <tr>
-                <td className="p-6 text-center text-neutral-500" colSpan={5}>
+                <td className="p-6 text-center text-neutral-500" colSpan={4}>
                   Belum ada pengajuan realokasi dari pengguna.
                 </td>
               </tr>
@@ -344,9 +338,8 @@ function ReallocationRequestsPanel() {
             {!isLoading &&
               data?.rows.map((req) => (
                 <tr key={req.id} className="border-b border-neutral-200 align-top last:border-0">
-                  <td className="p-3 text-neutral-600">Grid {req.origin_grid_id}</td>
                   <td className="p-3 font-medium text-neutral-900">
-                    {req.requested_district ?? `Grid ${req.requested_grid_id}`}
+                    {regionLabel(req.requested_district)}
                     {req.matching_score !== null && (
                       <>
                         <br />

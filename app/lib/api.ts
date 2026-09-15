@@ -24,6 +24,7 @@ import type {
   UmkmSelfReportListResult,
 } from "@/app/types/self-report";
 import { createClient } from "@/app/lib/supabase/client";
+import { titleCase } from "@/app/lib/format";
 
 export async function apiFetch<T>(
   input: RequestInfo | URL,
@@ -79,21 +80,32 @@ export function fetchModelAccuracy(): Promise<ModelAccuracy | null> {
   });
 }
 
-export function fetchUmkmList(filters: UmkmListFilters = {}): Promise<UmkmListResult> {
+// Real survey data enters this field inconsistently (all-lowercase, ALL
+// CAPS) -- normalized to Title Case here, once, at the data-fetching
+// boundary, so every consumer (cards, tables, map markers/popups, CSV
+// export) automatically gets a consistent display name without each call
+// site having to remember to format it.
+function normalizeUmkmBusiness(row: UmkmBusiness): UmkmBusiness {
+  return row.name ? { ...row, name: titleCase(row.name) } : row;
+}
+
+export async function fetchUmkmList(filters: UmkmListFilters = {}): Promise<UmkmListResult> {
   const params = new URLSearchParams();
   if (filters.district) params.set("district", filters.district);
   if (filters.search) params.set("search", filters.search);
   if (filters.ews_code !== undefined) params.set("ews_code", String(filters.ews_code));
   if (filters.limit !== undefined) params.set("limit", String(filters.limit));
   if (filters.offset !== undefined) params.set("offset", String(filters.offset));
-  return apiFetch<UmkmListResult>(`${API_URL}/api/umkm?${params.toString()}`);
+  const result = await apiFetch<UmkmListResult>(`${API_URL}/api/umkm?${params.toString()}`);
+  return { ...result, rows: result.rows.map(normalizeUmkmBusiness) };
 }
 
-export function fetchUmkmDetail(id: string): Promise<UmkmBusiness | null> {
-  return apiFetch<UmkmBusiness>(`${API_URL}/api/umkm/${id}`).catch((error: Error) => {
+export async function fetchUmkmDetail(id: string): Promise<UmkmBusiness | null> {
+  const row = await apiFetch<UmkmBusiness>(`${API_URL}/api/umkm/${id}`).catch((error: Error) => {
     if (error.message.includes("404")) return null;
     throw error;
   });
+  return row ? normalizeUmkmBusiness(row) : null;
 }
 
 export function fetchDashboardSummary(): Promise<DashboardSummary | null> {
