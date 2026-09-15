@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import LandingPage from "@/app/modules/landing/landing-page";
 
 export default function RootPage() {
-  redirect("/beranda/");
+  return <LandingPage />;
 }

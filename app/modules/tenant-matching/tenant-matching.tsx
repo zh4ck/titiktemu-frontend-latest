@@ -149,43 +149,47 @@ export default function TenantMatching() {
       </header>
 
       <div className="flex flex-col gap-4 lg:flex-row">
-        {!hasParamLocation && (
-          <aside className="flex w-full shrink-0 flex-col gap-2 lg:w-72">
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari UMKM di zona berisiko"
-              aria-label="Cari UMKM"
-            />
-            <h2 className="text-s6 font-semibold text-neutral-900">
-              UMKM Berisiko ({eligibleUmkm.length})
-            </h2>
-            <div className="flex max-h-[420px] flex-col gap-2 overflow-y-auto">
-              {isUmkmListLoading &&
-                Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
-              {!isUmkmListLoading && eligibleUmkm.length === 0 && (
-                <p className="text-b9 text-neutral-500">Tidak ada UMKM berisiko yang cocok.</p>
-              )}
-              {!isUmkmListLoading &&
-                eligibleUmkm.map((umkm) => (
-                  <button
-                    key={umkm.id}
-                    type="button"
-                    onClick={() => selectUmkm(umkm.id)}
-                    aria-pressed={selectedUmkmId === umkm.id}
-                    className={`rounded-xl border p-3 text-left transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
-                      selectedUmkmId === umkm.id ? "border-primary-500 bg-primary-50" : "border-border"
-                    }`}
-                  >
-                    <p className="text-b9 font-semibold text-neutral-900">{umkm.name ?? regionLabel(umkm.district_name)}</p>
-                    <p className="text-b9 text-neutral-500">
-                      {umkm.category} &middot; {regionLabel(umkm.district_name)} &middot; {umkm.zone_label?.toUpperCase()}
-                    </p>
-                  </button>
-                ))}
-            </div>
-          </aside>
-        )}
+        {/* Always visible now (previously hidden whenever arriving via a
+            Discovery Map redirect) -- so an operator landing directly on
+            this page can browse every bahaya-status UMKM themselves,
+            without having to go through Discovery Map first. */}
+        <aside className="flex w-full shrink-0 flex-col gap-2 lg:w-72">
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Cari UMKM di zona berisiko"
+            aria-label="Cari UMKM"
+          />
+          <h2 className="text-s6 font-semibold text-neutral-900">
+            UMKM Berisiko -- Bahaya ({eligibleUmkm.length})
+          </h2>
+          <div className="flex max-h-[420px] flex-col gap-2 overflow-y-auto lg:max-h-[calc(100vh-20rem)]">
+            {isUmkmListLoading &&
+              Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
+            {!isUmkmListLoading && eligibleUmkm.length === 0 && (
+              <p className="text-b9 text-neutral-500">Tidak ada UMKM berstatus bahaya saat ini.</p>
+            )}
+            {!isUmkmListLoading &&
+              eligibleUmkm.map((umkm) => (
+                <button
+                  key={umkm.id}
+                  type="button"
+                  onClick={() => selectUmkm(umkm.id)}
+                  aria-pressed={!hasParamLocation && selectedUmkmId === umkm.id}
+                  className={`rounded-xl border p-3 text-left transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
+                    !hasParamLocation && selectedUmkmId === umkm.id
+                      ? "border-primary-500 bg-primary-50"
+                      : "border-border"
+                  }`}
+                >
+                  <p className="text-b9 font-semibold text-neutral-900">{umkm.name ?? regionLabel(umkm.district_name)}</p>
+                  <p className="text-b9 text-neutral-500">
+                    {umkm.category} &middot; {regionLabel(umkm.district_name)} &middot; {umkm.zone_label?.toUpperCase()}
+                  </p>
+                </button>
+              ))}
+          </div>
+        </aside>
 
         <div className="flex flex-1 flex-col gap-4">
           {isZoneLoading && <Skeleton className="h-10 w-full" />}

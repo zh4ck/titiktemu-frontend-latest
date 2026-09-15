@@ -92,6 +92,10 @@
   --color-primary-teal-20: var(--primary-teal-20);
   --color-primary-teal-60: var(--primary-teal-60);
   --color-primary-teal-70: var(--primary-teal-70);
+  --color-brand-forest-50: var(--brand-forest-50);
+  --color-brand-forest-600: var(--brand-forest-600);
+  --color-brand-forest-700: var(--brand-forest-700);
+  --color-brand-forest-900: var(--brand-forest-900);
   --color-primary-50: var(--primary-50);
   --color-primary-100: var(--primary-100);
   --color-primary-200: var(--primary-200);
@@ -215,6 +219,15 @@
   --primary-teal-20: #d5f5f7;
   --primary-teal-60: #00aaaa;
   --primary-teal-70: #008a8b;
+  /* Sampled directly from design/landing.png (the public marketing page) --
+     a distinct forest-green brand ramp used only there (nav/hero text,
+     solid CTA buttons, footer, icon chips). Deliberately separate from the
+     primary-teal/secondary-green ramps above, which belong to the signed-in
+     app's EWS/zone color language -- don't merge the two. */
+  --brand-forest-50: #eef6f3;
+  --brand-forest-600: #16734e;
+  --brand-forest-700: #125e40;
+  --brand-forest-900: #173e32;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

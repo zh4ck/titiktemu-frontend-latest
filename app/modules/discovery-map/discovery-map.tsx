@@ -4,6 +4,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { Download } from "lucide-react";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
 import { ConfidenceBadge } from "@/app/components/ui/confidence-badge";
@@ -218,9 +219,11 @@ export default function DiscoveryMap() {
               variant="outline"
               onClick={exportCsv}
               disabled={!candidates?.rows.length}
-              className="rounded-[8px] border-neutral-500 text-neutral-600 font-semibold shadow-[0px_4px_24px_0px_rgba(0,0,0,0.04)]"
+              title="Unduh daftar UMKM yang sedang ditampilkan sebagai file CSV"
+              className="gap-1.5 rounded-[8px] border-primary-teal-60 bg-primary-teal-20/40 text-primary-teal-70 font-semibold shadow-[0px_4px_24px_0px_rgba(0,0,0,0.04)] hover:bg-primary-teal-20"
             >
-              Export .csv
+              <Download className="size-4" strokeWidth={2} />
+              Unduh CSV
             </Button>
           </div>
 

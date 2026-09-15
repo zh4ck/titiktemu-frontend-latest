@@ -56,14 +56,23 @@ export async function proxy(request: NextRequest) {
   const isAlwaysAccessiblePath = ALWAYS_ACCESSIBLE_PATHS.some((path) =>
     request.nextUrl.pathname.startsWith(path),
   );
+  // Exact match, not startsWith -- every path "starts with" "/", so this
+  // must not be folded into the prefix checks above. "/" is the public
+  // marketing landing page (see app/page.tsx / app/modules/landing) --
+  // guests must be able to reach it without being bounced to /login, the
+  // same way they can reach /login itself.
+  const isRootPath = request.nextUrl.pathname === "/";
 
-  if (!user && !isGuestOnlyPath && !isAlwaysAccessiblePath) {
+  if (!user && !isGuestOnlyPath && !isAlwaysAccessiblePath && !isRootPath) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirectTo", request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (user && isGuestOnlyPath) {
+  // A signed-in user has no reason to see the guest-facing login/signup
+  // forms OR the marketing landing page -- send them straight to Beranda,
+  // same treatment as the existing guest-only auth pages.
+  if (user && (isGuestOnlyPath || isRootPath)) {
     return NextResponse.redirect(new URL("/beranda/", request.url));
   }
 

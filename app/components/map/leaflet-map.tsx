@@ -13,6 +13,7 @@ export function LeafletMap({
   className,
   children,
   onClick,
+  scrollWheelZoom = true,
 }: {
   center?: LatLngExpression;
   zoom?: number;
@@ -23,13 +24,17 @@ export function LeafletMap({
   className?: string;
   children?: React.ReactNode;
   onClick?: (lat: number, lng: number) => void;
+  /** Default true everywhere the map is a real working tool. Pass false for
+   * a purely decorative/preview embed (e.g. the public landing page) so
+   * the mouse wheel keeps scrolling the page instead of zooming the map. */
+  scrollWheelZoom?: boolean;
 }) {
   return (
     <MapContainer
       center={center}
       zoom={zoom}
       className={className ?? "h-[600px] w-full rounded-xl"}
-      scrollWheelZoom
+      scrollWheelZoom={scrollWheelZoom}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
