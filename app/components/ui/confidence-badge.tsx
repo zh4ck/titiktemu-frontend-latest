@@ -19,7 +19,12 @@ export function ConfidenceBadge({ modelAccuracy }: { modelAccuracy: ModelAccurac
       title={
         `Validated against ${modelAccuracy.n} real surveyed UMKM points ` +
         `(95% CI ${modelAccuracy.ci_95_low_pct.toFixed(1)}-${modelAccuracy.ci_95_high_pct.toFixed(1)}%). ` +
-        `As of the last analytics batch run (${new Date(modelAccuracy.computed_at).toLocaleString()}).`
+        `Tolerant of a one-tier miss (e.g. waspada predicted as bahaya) since ` +
+        `aman/waspada/bahaya is an ordered risk scale` +
+        (modelAccuracy.exact_match_accuracy_pct != null
+          ? ` -- exact-tier match alone is ${modelAccuracy.exact_match_accuracy_pct.toFixed(1)}%.`
+          : ".") +
+        ` As of the last analytics batch run (${new Date(modelAccuracy.computed_at).toLocaleString()}).`
       }
     >
       {modelAccuracy.accuracy_pct.toFixed(1)}% -- {CONFIDENCE_LABEL[modelAccuracy.confidence_level]}

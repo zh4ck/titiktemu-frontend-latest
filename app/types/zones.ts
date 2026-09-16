@@ -26,6 +26,14 @@ export type ZoneLabel = "aman" | "waspada" | "bahaya";
 // number, which the backend deliberately doesn't expose (near-100% by
 // construction, not a real-world accuracy figure). confidence_level is
 // derived from `n`, not from accuracy_pct -- don't re-derive it here.
+//
+// accuracy_pct is ORDINAL/adjacent-tier-tolerant: aman/waspada/bahaya is an
+// ordered risk scale, so a one-tier miss (e.g. real waspada predicted as
+// bahaya) counts as correct while a two-tier aman<->bahaya miss does not.
+// exact_match_accuracy_pct is the stricter, untolerant figure -- both real,
+// both LOOCV-validated against the same survey data, just scored
+// differently. Nullable since rows from before this distinction existed
+// won't have them.
 export type ConfidenceLevel = "high" | "moderate" | "low";
 export type ModelAccuracy = {
   accuracy_pct: number;
@@ -33,6 +41,8 @@ export type ModelAccuracy = {
   ci_95_low_pct: number;
   ci_95_high_pct: number;
   confidence_level: ConfidenceLevel;
+  exact_match_accuracy_pct: number | null;
+  opposite_extreme_error_pct: number | null;
   computed_at: string;
 };
 

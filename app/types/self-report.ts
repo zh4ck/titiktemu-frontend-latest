@@ -8,6 +8,13 @@
 // titikLokasi) -- see app/modules/umkm-self-tracker/self-tracker-form.tsx.
 
 export type TenantType = "umkm_tetap" | "umkm_seasonal" | "franchise_tetap" | "franchise_seasonal";
+export type BusinessCategory =
+  | "makanan-ringan"
+  | "kuliner"
+  | "kerajinan"
+  | "jasa"
+  | "dagang-retail"
+  | "lainnya";
 export type RentPeriodUnit = "hari" | "bulan" | "tahun";
 export type SelfReportStatus = "pending" | "reviewed" | "exported";
 
@@ -16,6 +23,7 @@ export type UmkmSelfReport = {
   submitted_by: string | null;
   business_name: string;
   description: string | null;
+  category: BusinessCategory | null;
   tenant_type: TenantType | null;
   latitude: number;
   longitude: number;
@@ -40,6 +48,7 @@ export type UmkmSelfReportInput = {
   latitude: number;
   longitude: number;
   description?: string;
+  category?: BusinessCategory;
   tenant_type?: TenantType;
   tenant_area_m2?: number;
   target_market?: string;

@@ -35,7 +35,7 @@ import { useLocationStore } from "@/app/lib/location-store";
 import { regionLabel } from "@/app/lib/format";
 import { ConfidenceBadge } from "@/app/components/ui/confidence-badge";
 import { Badge } from "@/app/components/ui/badge";
-import type { RentPeriodUnit, TenantType } from "@/app/types/self-report";
+import type { BusinessCategory, RentPeriodUnit, TenantType } from "@/app/types/self-report";
 import type { ZoneLabel } from "@/app/types/zones";
 
 const ZONE_BADGE_VARIANT: Record<ZoneLabel, "secondary" | "default" | "primary"> = {
@@ -56,7 +56,7 @@ type FormState = {
   fotoUsahaName: string;
   namaUsaha: string;
   deskripsi: string;
-  kategori: string;
+  kategori: BusinessCategory | "";
   tenantType: TenantType | "";
   latitude: string;
   longitude: string;
@@ -139,6 +139,12 @@ function isFormComplete(form: FormState): boolean {
     form.fotoUsahaName.trim().length > 0 &&
     form.namaUsaha.trim().length > 0 &&
     form.kategori.trim().length > 0 &&
+    // Required: this is the real chain/franchise-vs-independent signal
+    // titiktemu-analytics needs reliably captured (the old free-text
+    // survey field this replaces left it null/wrong for most chains --
+    // see that repo's TODO.md). A self-reporting owner always knows their
+    // own tenancy type, unlike a third-party surveyor guessing.
+    form.tenantType.trim().length > 0 &&
     form.latitude.trim().length > 0 &&
     form.longitude.trim().length > 0 &&
     form.statusUsaha.trim().length > 0
@@ -344,6 +350,7 @@ export default function UmkmSelfTrackerForm() {
         latitude: lat,
         longitude: lng,
         description: form.deskripsi.trim() || undefined,
+        category: form.kategori || undefined,
         tenant_type: form.tenantType || undefined,
         tenant_area_m2: toNumberOrUndefined(form.luasTempatM2),
         target_market: form.targetPasar.trim() || undefined,
@@ -474,13 +481,13 @@ export default function UmkmSelfTrackerForm() {
             options={KATEGORI_OPTIONS}
             value={form.kategori || undefined}
             disabled={!isEditable}
-            onValueChange={(value) => updateField("kategori", value)}
+            onValueChange={(value) => updateField("kategori", value as BusinessCategory)}
             placeholder="Pilih kategori usaha"
           />
         </div>
 
         <div className="flex flex-col gap-2">
-          <FieldLabel>Jenis Penyewa</FieldLabel>
+          <FieldLabel required>Jenis Penyewa</FieldLabel>
           <Dropdown
             options={TENANT_TYPE_OPTIONS}
             value={form.tenantType || undefined}
