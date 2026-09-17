@@ -94,6 +94,10 @@ export async function fetchUmkmList(filters: UmkmListFilters = {}): Promise<Umkm
   if (filters.district) params.set("district", filters.district);
   if (filters.search) params.set("search", filters.search);
   if (filters.ews_code !== undefined) params.set("ews_code", String(filters.ews_code));
+  if (filters.category) params.set("category", filters.category);
+  if (filters.min_price !== undefined) params.set("min_price", String(filters.min_price));
+  if (filters.max_price !== undefined) params.set("max_price", String(filters.max_price));
+  if (filters.max_dist_m !== undefined) params.set("max_dist_m", String(filters.max_dist_m));
   if (filters.limit !== undefined) params.set("limit", String(filters.limit));
   if (filters.offset !== undefined) params.set("offset", String(filters.offset));
   const result = await apiFetch<UmkmListResult>(`${API_URL}/api/umkm?${params.toString()}`);

@@ -52,7 +52,16 @@ function Dropdown({
           className,
         )}
       >
-        <SelectValue placeholder={placeholder} />
+        {/* Base UI's Select.Value renders the raw VALUE by default -- it
+            only shows the human label if you explicitly map it yourself
+            via this render-prop. Without it, every Dropdown usage where
+            value !== label (most of them) silently displayed things like
+            "all"/"500" instead of "Semua Jenis"/"< 500 m". */}
+        <SelectValue placeholder={placeholder}>
+          {(selected: string | null) =>
+            options.find((option) => option.value === selected)?.label ?? placeholder
+          }
+        </SelectValue>
       </SelectTrigger>
       <SelectContent
         side="bottom"

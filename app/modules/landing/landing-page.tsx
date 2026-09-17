@@ -21,6 +21,9 @@ import { useGrid } from "@/app/hooks/use-grid";
 import { useModelAccuracy } from "@/app/hooks/use-model-accuracy";
 import { useCurrentLocation } from "@/app/hooks/use-current-location";
 import { useZoneLookup } from "@/app/hooks/use-zone-lookup";
+import { useUmkm } from "@/app/hooks/use-umkm";
+import { Dropdown, type DropdownOption } from "@/app/components/ui/dropdown";
+import type { UmkmTenantCategory } from "@/app/types/umkm";
 
 const LeafletMap = dynamic(
   () =>
@@ -38,6 +41,13 @@ const CurrentLocationMarker = dynamic(
   () =>
     import("@/app/components/map/current-location-marker").then(
       (mod) => mod.CurrentLocationMarker,
+    ),
+  { ssr: false },
+);
+const UmkmMarkerLayer = dynamic(
+  () =>
+    import("@/app/components/map/umkm-marker-layer").then(
+      (mod) => mod.UmkmMarkerLayer,
     ),
   { ssr: false },
 );
@@ -231,11 +241,43 @@ const TEAM: TeamMember[] = [
   },
 ];
 
-// Decorative-only, matching design/map-landing-page.png's search/filter
-// row -- this is a marketing teaser of the real Discovery Map, not the
-// working filter UI (that lives at /beranda after exploring), so these
-// don't actually filter anything.
-const MAP_FILTERS = ["Kategori", "Kisaran Harga", "Radius"];
+// Real, working filters (backed by GET /api/umkm's category/min_price/
+// max_price/max_dist_m params) -- matches design/map-landing-page.png's
+// search/filter row, but this is the actual live preview, not a decorative
+// mockup. "Kategori" filters on the real tenant-type value the analytics
+// pipeline populates on umkm_businesses.category (umkm_tetap/umkm_seasonal/
+// franchise_tetap) -- verified directly against the live database that
+// there is no food/retail/service-style "business category" column
+// anywhere in the real data, so the options here are the honest ones.
+const CATEGORY_OPTIONS: DropdownOption[] = [
+  { value: "all", label: "Semua Jenis" },
+  { value: "umkm_tetap", label: "UMKM Tetap" },
+  { value: "umkm_seasonal", label: "UMKM Musiman" },
+  { value: "franchise_tetap", label: "Franchise Tetap" },
+];
+
+type PriceBand = { value: string; label: string; min?: number; max?: number };
+// Bands chosen from the real reference_price_per_txn_idr range in the
+// live data (Rp10.000-Rp150.000), not arbitrary round numbers.
+const PRICE_RANGE_OPTIONS: PriceBand[] = [
+  { value: "all", label: "Semua Harga" },
+  { value: "under-50k", label: "< Rp 50.000", max: 50_000 },
+  { value: "50k-100k", label: "Rp 50.000 - Rp 100.000", min: 50_000, max: 100_000 },
+  { value: "over-100k", label: "> Rp 100.000", min: 100_000 },
+];
+
+type RadiusBand = { value: string; label: string; max?: number };
+// Thresholds chosen from the real dist_to_station_m range in the live
+// data (18m-4.6km, avg ~1km).
+const RADIUS_OPTIONS: RadiusBand[] = [
+  { value: "all", label: "Semua Radius" },
+  { value: "500", label: "< 500 m", max: 500 },
+  { value: "1000", label: "< 1 km", max: 1_000 },
+  { value: "2000", label: "< 2 km", max: 2_000 },
+];
+
+const FILTER_DROPDOWN_CLASSNAME =
+  "h-auto w-auto min-w-0 rounded-xl border-neutral-200 bg-neutral-0 px-4 py-3 font-jakarta text-b8 text-neutral-600 shadow-sm hover:bg-neutral-50 focus-visible:ring-primary-teal-60";
 
 function SectionHeading({
   title,
@@ -385,7 +427,29 @@ export default function LandingPage() {
   // zone status once it resolves.
   const { location } = useCurrentLocation();
   const { data: ownZone } = useZoneLookup(location);
-  const userMarkerColor = ownZone ? EWS_MARKER_COLOR[ownZone.ews_code] : NEUTRAL_MARKER_COLOR;
+  const userMarkerColor = ownZone
+    ? EWS_MARKER_COLOR[ownZone.ews_code]
+    : NEUTRAL_MARKER_COLOR;
+
+  // Map preview search/filter state -- real, working filters against
+  // GET /api/umkm (search now also matches district/kecamatan, i.e. a
+  // station/area name, not just a business name).
+  const [mapSearch, setMapSearch] = useState("");
+  const [mapCategory, setMapCategory] = useState("all");
+  const [mapPriceRange, setMapPriceRange] = useState("all");
+  const [mapRadius, setMapRadius] = useState("all");
+
+  const selectedPriceBand = PRICE_RANGE_OPTIONS.find((o) => o.value === mapPriceRange);
+  const selectedRadiusBand = RADIUS_OPTIONS.find((o) => o.value === mapRadius);
+
+  const { data: mapCandidates, isLoading: isMapCandidatesLoading } = useUmkm({
+    search: mapSearch.trim() || undefined,
+    category: mapCategory !== "all" ? (mapCategory as UmkmTenantCategory) : undefined,
+    min_price: selectedPriceBand?.min,
+    max_price: selectedPriceBand?.max,
+    max_dist_m: selectedRadiusBand?.max,
+    limit: 100,
+  });
 
   return (
     <div className="flex min-h-svh flex-col bg-neutral-0 text-neutral-900">
@@ -587,39 +651,67 @@ export default function LandingPage() {
 
           <div className="flex w-full flex-col gap-3 sm:flex-row">
             <div className="flex flex-1 items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-0 px-4 py-3 shadow-sm">
-              <MapPin className="size-4 shrink-0 text-neutral-400" aria-hidden="true" />
+              <MapPin
+                className="size-4 shrink-0 text-neutral-400"
+                aria-hidden="true"
+              />
               <input
                 type="text"
+                value={mapSearch}
+                onChange={(event) => setMapSearch(event.target.value)}
                 placeholder="Cari stasiun atau nama usaha..."
-                readOnly
-                onFocus={(event) => event.currentTarget.blur()}
-                aria-label="Cari stasiun atau nama usaha (buka Beranda untuk pencarian penuh)"
+                aria-label="Cari stasiun atau nama usaha"
                 className="w-full bg-transparent font-jakarta text-b8 text-neutral-700 outline-none placeholder:text-neutral-400"
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              {MAP_FILTERS.map((label) => (
-                <button
-                  key={label}
-                  type="button"
-                  className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-neutral-0 px-4 py-3 font-jakarta text-b8 text-neutral-600 shadow-sm hover:bg-neutral-50"
-                >
-                  {label}
-                  <ChevronDown className="size-4 text-neutral-400" aria-hidden="true" />
-                </button>
-              ))}
+              <Dropdown
+                options={CATEGORY_OPTIONS}
+                value={mapCategory}
+                onValueChange={setMapCategory}
+                placeholder="Kategori"
+                className={FILTER_DROPDOWN_CLASSNAME}
+              />
+              <Dropdown
+                options={PRICE_RANGE_OPTIONS}
+                value={mapPriceRange}
+                onValueChange={setMapPriceRange}
+                placeholder="Kisaran Harga"
+                className={FILTER_DROPDOWN_CLASSNAME}
+              />
+              <Dropdown
+                options={RADIUS_OPTIONS}
+                value={mapRadius}
+                onValueChange={setMapRadius}
+                placeholder="Radius"
+                className={FILTER_DROPDOWN_CLASSNAME}
+              />
             </div>
           </div>
+
+          <p className="self-start font-jakarta text-b9 text-neutral-500">
+            {isMapCandidatesLoading
+              ? "Memuat usaha..."
+              : `${mapCandidates?.total ?? 0} usaha ditemukan`}
+          </p>
 
           <div className="relative h-[320px] w-full overflow-hidden rounded-2xl border border-neutral-200 shadow-lg sm:h-[420px] md:h-[480px]">
             <LeafletMap className="h-full w-full" scrollWheelZoom={false}>
               <GeoJsonLayer data={grid} modelAccuracy={modelAccuracy} />
+              <UmkmMarkerLayer rows={mapCandidates?.rows ?? []} />
               {location && (
-                <CurrentLocationMarker lat={location.lat} lng={location.lng} color={userMarkerColor} />
+                <CurrentLocationMarker
+                  lat={location.lat}
+                  lng={location.lng}
+                  color={userMarkerColor}
+                />
               )}
             </LeafletMap>
             <div className="absolute bottom-3 right-3 z-[900] flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-0/95 px-3 py-1.5 font-jakarta text-b9 font-semibold text-neutral-900 shadow-sm backdrop-blur-sm">
-              <MapPin className="size-3.5 text-primary-teal-70" aria-hidden="true" />
+              <MapPin
+                className="size-3.5 text-primary-teal-70"
+                aria-hidden="true"
+              />
               TitikTemu
             </div>
           </div>
@@ -695,12 +787,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA -- matches design/footer-updated.png. The gradient's first
-          color-stop reaches brand-forest-900 by 12% of the section's
-          height so the heading (well below that, thanks to the section's
-          own top padding) always sits on a fully dark background -- only
-          the very top sliver blends from the previous (light) section. */}
-      <section className="bg-[linear-gradient(180deg,var(--brand-forest-50)_0%,var(--brand-forest-900)_12%,var(--brand-forest-900)_100%)] px-5 py-16 text-center sm:px-8 sm:py-20">
+      {/* CTA -- matches design/footer-updated.png. */}
+      <section className="bg-[#173E32] px-5 py-16 text-center sm:px-8 sm:py-20">
         <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-5">
           <h2 className="text-h5 font-jakarta font-bold text-neutral-0 sm:text-h3">
             Mulai dari perjalanan Anda. Temukan usaha lokal di sekitarnya.
@@ -731,7 +819,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FOOTER */}
+      {/* FOOTER -- restored: an earlier edit had merged this into the CTA
+          section above (relabeling it <footer>) and dropped the logo/nav/
+          copyright content entirely. Kept as its own element since a page
+          shouldn't have its CTA banner double as the <footer> landmark
+          when a real footer exists right below it. */}
       <footer className="bg-gradient-to-b from-brand-forest-900 to-[#0F2A22] px-5 py-8 sm:px-8">
         <div className="mx-auto flex w-full max-w-[1200px] flex-col items-center gap-6 border-t border-neutral-0/10 pt-8 md:flex-row md:items-center md:justify-between">
           <div className="flex font-jakarta flex-col items-center gap-1 md:items-start">

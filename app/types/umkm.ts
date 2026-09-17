@@ -25,10 +25,25 @@ export type UmkmBusiness = {
   zone_label: ZoneLabel | null;
 };
 
+// category here means the real tenant-type value the analytics pipeline
+// actually populates on umkm_businesses.category (verified directly
+// against the live database) -- there is no food/retail/service-style
+// "business category" column anywhere in the real data, so don't invent
+// one; this is genuinely what's filterable.
+export type UmkmTenantCategory =
+  | "umkm_tetap"
+  | "umkm_seasonal"
+  | "franchise_tetap"
+  | "franchise_seasonal";
+
 export type UmkmListFilters = {
   district?: string;
   search?: string;
   ews_code?: number;
+  category?: UmkmTenantCategory;
+  min_price?: number;
+  max_price?: number;
+  max_dist_m?: number;
   limit?: number;
   offset?: number;
 };
