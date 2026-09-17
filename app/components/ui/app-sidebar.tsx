@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -111,8 +112,14 @@ export function AppSidebar() {
           href="/beranda/"
           className="flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary-300 group-data-[collapsible=icon]:justify-center"
         >
-          <span className="flex size-15 shrink-0 items-center justify-center rounded-lg text-neutral-0">
-            <img src="./titiktemu.png" className="w-[128px]"/>
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-lg text-neutral-0">
+            {/* next/image, not a plain <img> -- the source file is an
+                11772x11772px master (2.6MB); next/image resizes/optimizes
+                it to what's actually needed instead of shipping the full
+                file to every visitor. Also fixes the old logo's blur: the
+                previous titiktemu.png was a 36x36 source stretched to
+                128px. */}
+            <Image src="/logo.png" alt="TitikTemu" width={44} height={44} className="size-11 rounded-lg" />
           </span>
         </Link>
         {/* Sidebar collapse/expand now lives here, right under the logo,

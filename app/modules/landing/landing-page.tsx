@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import {
@@ -8,6 +9,7 @@ import {
   ChevronDown,
   Home as HomeIcon,
   Map as MapIcon,
+  MapPin,
   Menu,
   Shield,
   Sparkles,
@@ -17,7 +19,8 @@ import {
 } from "lucide-react";
 import { useGrid } from "@/app/hooks/use-grid";
 import { useModelAccuracy } from "@/app/hooks/use-model-accuracy";
-import Image from "next/image";
+import { useCurrentLocation } from "@/app/hooks/use-current-location";
+import { useZoneLookup } from "@/app/hooks/use-zone-lookup";
 
 const LeafletMap = dynamic(
   () =>
@@ -31,6 +34,25 @@ const GeoJsonLayer = dynamic(
     ),
   { ssr: false },
 );
+const CurrentLocationMarker = dynamic(
+  () =>
+    import("@/app/components/map/current-location-marker").then(
+      (mod) => mod.CurrentLocationMarker,
+    ),
+  { ssr: false },
+);
+
+// Same aman/waspada/bahaya convention as geojson-layer.tsx/home.tsx --
+// colors the visitor's own pulse marker by their real zone status instead
+// of a fixed color. Neutral teal (not red) when the zone is still loading
+// or the visitor is outside the study area, so "we don't know yet" is
+// never mistaken for "you're in danger."
+const EWS_MARKER_COLOR: Record<number, string> = {
+  0: "#39b332",
+  1: "#eab308",
+  2: "#dc2626",
+};
+const NEUTRAL_MARKER_COLOR = "#00aaaa";
 
 const NAV_LINKS = [
   { label: "Fitur", href: "#fitur" },
@@ -181,42 +203,39 @@ const TEAM: TeamMember[] = [
     name: "Umar Faiz Rahman",
     role: "Project Leader",
     accent: "bg-primary-teal-60",
-    profile: "./img/fizi.png",
+    profile: "/img/fizi.png",
   },
   {
     name: "Steven Dyanizha Ananda",
     role: "Geospatial Data Scientist",
     accent: "bg-brand-forest-600",
-    profile: "./img/tipen.png",
+    profile: "/img/tipen.png",
   },
   {
     name: "Zayyan Ramadzaki Firdaus",
     role: "Fullstack WebGIS Developer",
     accent: "bg-brand-forest-900",
-    profile: "./img/zayyan.png",
+    profile: "/img/zayyan.png",
   },
   {
     name: "Rahel Meilinda Aruan",
     role: "UI/UX Designer",
     accent: "bg-primary-teal-70",
-    profile: "./img/acel.png",
+    profile: "/img/acel.png",
   },
   {
     name: "Salwa Alifa Putri",
     role: "Product & Business Impact Strategist",
     accent: "bg-brand-forest-700",
-    profile: "./img/salwa.png",
+    profile: "/img/salwa.png",
   },
 ];
 
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-}
+// Decorative-only, matching design/map-landing-page.png's search/filter
+// row -- this is a marketing teaser of the real Discovery Map, not the
+// working filter UI (that lives at /beranda after exploring), so these
+// don't actually filter anything.
+const MAP_FILTERS = ["Kategori", "Kisaran Harga", "Radius"];
 
 function SectionHeading({
   title,
@@ -243,16 +262,10 @@ function SectionHeading({
   );
 }
 
-/** Original simplified station/transit illustration -- not a recreation of
- * the Figma artwork (see file header), captures the same idea (a covered
- * platform, a train, trees, a passenger) using plain shapes/gradients in
- * the brand palette. */
-
-
 function RoleCard({ role }: { role: Role }) {
   const Icon = role.icon;
   return (
-    <div className="flex w-full flex-col gap-4 rounded-2xl border border-neutral-200 bg-brand-forest-50/60 p-6">
+    <div className="flex w-full flex-col gap-4 rounded-2xl border border-neutral-200 bg-neutral-0/60 p-6">
       <span
         className={`flex size-10 shrink-0 items-center justify-center rounded-xl text-neutral-0 ${role.iconBg}`}
       >
@@ -302,7 +315,7 @@ function FeatureCard({ feature }: { feature: Feature }) {
 function StepCard({ step }: { step: Step }) {
   const Icon = step.icon;
   return (
-    <div className="flex flex-1 flex-col gap-3 rounded-2xl border border-neutral-200 bg-brand-forest-50/60 p-6">
+    <div className="flex flex-1 flex-col gap-3 rounded-2xl border border-neutral-200 bg-neutral-0/60 p-6">
       <span
         className={`flex size-10 shrink-0 items-center justify-center rounded-xl text-neutral-0 ${step.iconBg}`}
       >
@@ -342,12 +355,12 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 function TeamCard({ member }: { member: TeamMember }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl border border-neutral-200 bg-neutral-0 p-6 text-center">
-      <img
+      <Image
         src={member.profile}
         alt={member.name.split(" ")[0]}
         width={80}
         height={80}
-        className="rounded-full"
+        className="size-20 rounded-full object-cover"
       />
       <div>
         <p className="text-s6 font-jakarta font-bold text-neutral-900">
@@ -366,13 +379,27 @@ export default function LandingPage() {
   const { data: grid } = useGrid();
   const { data: modelAccuracy } = useModelAccuracy();
 
+  // Real browser geolocation (same shared store every other page uses --
+  // see app/lib/location-store.ts) -- asked here too so an unauthenticated
+  // visitor sees themselves on the preview map, colored by their own real
+  // zone status once it resolves.
+  const { location } = useCurrentLocation();
+  const { data: ownZone } = useZoneLookup(location);
+  const userMarkerColor = ownZone ? EWS_MARKER_COLOR[ownZone.ews_code] : NEUTRAL_MARKER_COLOR;
+
   return (
     <div className="flex min-h-svh flex-col bg-neutral-0 text-neutral-900">
       {/* NAV */}
       <header className="sticky  top-0 z-50 border-b border-neutral-200 bg-neutral-0/95 backdrop-blur-sm">
         <div className="mx-auto flex h-[72px] w-full max-w-[1200px] items-center justify-evenly px-5 sm:px-8">
           <Link href="/" className="flex items-center gap-2">
-            <img src="/titiktemu.png" alt="TitikTemu" className="h-8 hidden md:block w-auto" />
+            <Image
+              src="/logo.png"
+              alt="TitikTemu"
+              width={32}
+              height={32}
+              className="hidden size-8 md:block"
+            />
             <span className="text-s5 font-bold font-jakarta text-brand-forest-900">
               TitikTemu
             </span>
@@ -451,8 +478,13 @@ export default function LandingPage() {
         )}
       </header>
 
+      {/* Every section below chains its background gradient into the next
+          section's own starting color, so the whole page reads as one
+          continuous wash (mint -> white -> mint -> ... -> dark green)
+          instead of hard flat-color seams between sections. */}
+
       {/* HERO */}
-      <section className="bg-gradient-to-b from-brand-forest-50 to-neutral-0 px-5 pb-16 pt-14 sm:px-8 sm:pt-20 lg:pb-24">
+      <section className="bg-gradient-to-b from-brand-forest-50 to-neutral-0 px-5 pb-16 pt-14 sm:px-8 sm:pt-0 lg:pb-2">
         <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16">
           <div className="flex flex-col items-start gap-5">
             <span className="flex items-center gap-2 text-b8 font-semibold text-primary-teal-70">
@@ -473,7 +505,7 @@ export default function LandingPage() {
             <div className="flex flex-wrap items-center gap-3">
               <Link
                 href="/beranda/"
-                className="flex items-centerfont-jakarta gap-1.5 rounded-lg bg-brand-forest-600 px-5 py-3 text-b7 font-semibold text-neutral-0 hover:bg-brand-forest-700"
+                className="flex items-center font-jakarta gap-1.5 rounded-lg bg-brand-forest-600 px-5 py-3 text-b7 font-semibold text-neutral-0 hover:bg-brand-forest-700"
               >
                 Jelajahi UMKM <span aria-hidden="true">&rarr;</span>
               </Link>
@@ -489,12 +521,16 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <img src="./illustration-1.svg" alt="Ilustrasi stasiun transit dengan UMKM di sekitarnya" className="w-full" />
+          <img
+            src="/illustration-1.svg"
+            alt="Ilustrasi stasiun transit dengan UMKM di sekitarnya"
+            className="w-full hidden md:block"
+          />
         </div>
       </section>
 
       {/* ROLES */}
-      <section className="bg-brand-forest-50/50 px-5 py-16 sm:px-8 sm:py-20">
+      <section className="bg-gradient-to-b from-neutral-0 to-brand-forest-50 px-5 py-16 sm:px-8 sm:py-20">
         <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-10">
           <SectionHeading
             title="Usaha, perjalanan, dan peluang. Bertemu di TitikTemu."
@@ -517,7 +553,10 @@ export default function LandingPage() {
       </section>
 
       {/* FEATURES */}
-      <section id="fitur" className="bg-neutral-0 px-5 py-16 sm:px-8 sm:py-20">
+      <section
+        id="fitur"
+        className="bg-gradient-to-b from-brand-forest-50 to-neutral-0 px-5 py-16 sm:px-8 sm:py-20"
+      >
         <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-10">
           <SectionHeading
             title="Dari informasi lokasi, menuju peluang yang terhubung."
@@ -531,21 +570,60 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* MAP PREVIEW */}
+      {/* MAP PREVIEW -- matches design/map-landing-page.png: a search/filter
+          bar (decorative -- see MAP_FILTERS), the real live zone map (not a
+          static mockup), the visitor's own pulsing location colored by
+          their real EWS status, and a small "TitikTemu" pill on the map
+          itself. */}
       <section
         id="peta"
-        className="bg-brand-forest-50/50 px-5 py-16 sm:px-8 sm:py-20"
+        className="bg-gradient-to-b from-neutral-0 to-brand-forest-50 px-5 py-16 sm:px-8 sm:py-20"
       >
-        <div className="mx-auto flex w-full max-w-[1200px] flex-col items-center gap-8">
+        <div className="mx-auto flex w-full max-w-[1200px] flex-col items-center gap-6">
           <SectionHeading
-            title="Mulai Jelajahi UMKM Lokal di Sekitar Anda!"
-            subtitle="Dukung pertumbuhan ekonomi lokal dengan menemukan berbagai usaha menarik di sekitar stasiun transit. Temukan kebutuhan Anda sekarang, langsung dari peta!"
+            title="Temukan usaha lokal di sekitar Anda!"
+            subtitle="Dukung pertumbuhan ekonomi lokal dengan menemukan berbagai usaha menarik di sekitar stasiun transit."
           />
+
+          <div className="flex w-full flex-col gap-3 sm:flex-row">
+            <div className="flex flex-1 items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-0 px-4 py-3 shadow-sm">
+              <MapPin className="size-4 shrink-0 text-neutral-400" aria-hidden="true" />
+              <input
+                type="text"
+                placeholder="Cari stasiun atau nama usaha..."
+                readOnly
+                onFocus={(event) => event.currentTarget.blur()}
+                aria-label="Cari stasiun atau nama usaha (buka Beranda untuk pencarian penuh)"
+                className="w-full bg-transparent font-jakarta text-b8 text-neutral-700 outline-none placeholder:text-neutral-400"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {MAP_FILTERS.map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-neutral-0 px-4 py-3 font-jakarta text-b8 text-neutral-600 shadow-sm hover:bg-neutral-50"
+                >
+                  {label}
+                  <ChevronDown className="size-4 text-neutral-400" aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="relative h-[320px] w-full overflow-hidden rounded-2xl border border-neutral-200 shadow-lg sm:h-[420px] md:h-[480px]">
             <LeafletMap className="h-full w-full" scrollWheelZoom={false}>
               <GeoJsonLayer data={grid} modelAccuracy={modelAccuracy} />
+              {location && (
+                <CurrentLocationMarker lat={location.lat} lng={location.lng} color={userMarkerColor} />
+              )}
             </LeafletMap>
+            <div className="absolute bottom-3 right-3 z-[900] flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-0/95 px-3 py-1.5 font-jakarta text-b9 font-semibold text-neutral-900 shadow-sm backdrop-blur-sm">
+              <MapPin className="size-3.5 text-primary-teal-70" aria-hidden="true" />
+              TitikTemu
+            </div>
           </div>
+
           <Link
             href="/beranda/"
             className="flex font-jakarta items-center gap-1.5 rounded-lg bg-brand-forest-600 px-5 py-3 text-b7 font-semibold text-neutral-0 hover:bg-brand-forest-700"
@@ -558,7 +636,7 @@ export default function LandingPage() {
       {/* STEPS + FAQ */}
       <section
         id="panduan"
-        className="bg-neutral-0 px-5 py-16 sm:px-8 sm:py-20"
+        className="bg-gradient-to-b from-brand-forest-50 to-neutral-0 px-5 py-16 sm:px-8 sm:py-20"
       >
         <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-14">
           <div className="flex flex-col gap-10">
@@ -589,7 +667,7 @@ export default function LandingPage() {
       {/* TEAM */}
       <section
         id="tentang-kami"
-        className="bg-brand-forest-50/50 px-5 py-16 sm:px-8 sm:py-20"
+        className="bg-gradient-to-b from-neutral-0 to-brand-forest-50 px-5 py-16 sm:px-8 sm:py-20"
       >
         <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-10">
           <SectionHeading
@@ -617,11 +695,15 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="bg-[#173E32] px-5 py-16 text-center sm:px-8 sm:py-20">
+      {/* CTA -- matches design/footer-updated.png. The gradient's first
+          color-stop reaches brand-forest-900 by 12% of the section's
+          height so the heading (well below that, thanks to the section's
+          own top padding) always sits on a fully dark background -- only
+          the very top sliver blends from the previous (light) section. */}
+      <section className="bg-[linear-gradient(180deg,var(--brand-forest-50)_0%,var(--brand-forest-900)_12%,var(--brand-forest-900)_100%)] px-5 py-16 text-center sm:px-8 sm:py-20">
         <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-5">
           <h2 className="text-h5 font-jakarta font-bold text-neutral-0 sm:text-h3">
-            Mari beri UMKM ruang untuk tumbuh bersama transportasi kita.
+            Mulai dari perjalanan Anda. Temukan usaha lokal di sekitarnya.
           </h2>
           <p className="text-b7 font-jakarta text-neutral-300">
             Mulai dari mengenal usaha lokal di sekitar stasiun.
@@ -629,9 +711,9 @@ export default function LandingPage() {
           <div className="flex flex-col items-center gap-3 sm:flex-row">
             <Link
               href="/beranda/"
-              className="flex font-jakarta items-center gap-1.5 rounded-lg bg-primary-teal-60 px-5 py-3 text-b7 font-semibold text-neutral-0 hover:bg-primary-teal-70"
+              className="flex font-jakarta items-center gap-1.5 rounded-lg bg-brand-forest-600 px-5 py-3 text-b7 font-semibold text-neutral-0 hover:bg-brand-forest-700"
             >
-              Jelajahi UMKM <span aria-hidden="true">&rarr;</span>
+              Jelajahi Peta <span aria-hidden="true">&rarr;</span>
             </Link>
             <Link
               href="/signup/"
@@ -650,14 +732,16 @@ export default function LandingPage() {
       </section>
 
       {/* FOOTER */}
-      <footer className="bg-[#0F2A22] px-5 py-8 sm:px-8">
+      <footer className="bg-gradient-to-b from-brand-forest-900 to-[#0F2A22] px-5 py-8 sm:px-8">
         <div className="mx-auto flex w-full max-w-[1200px] flex-col items-center gap-6 border-t border-neutral-0/10 pt-8 md:flex-row md:items-center md:justify-between">
           <div className="flex font-jakarta flex-col items-center gap-1 md:items-start">
             <span className="flex items-center gap-2 text-s6 font-bold text-neutral-0">
-              <img
-                src="/titiktemu.png"
+              <Image
+                src="/logo.png"
                 alt=""
-                className="h-6 w-auto"
+                width={24}
+                height={24}
+                className="size-6"
                 aria-hidden="true"
               />
               TitikTemu
