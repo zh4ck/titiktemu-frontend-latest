@@ -425,7 +425,7 @@ export default function LandingPage() {
   // see app/lib/location-store.ts) -- asked here too so an unauthenticated
   // visitor sees themselves on the preview map, colored by their own real
   // zone status once it resolves.
-  const { location } = useCurrentLocation();
+  const { location, status: locationStatus } = useCurrentLocation();
   const { data: ownZone } = useZoneLookup(location);
   const userMarkerColor = ownZone
     ? EWS_MARKER_COLOR[ownZone.ews_code]
@@ -441,6 +441,8 @@ export default function LandingPage() {
 
   const selectedPriceBand = PRICE_RANGE_OPTIONS.find((o) => o.value === mapPriceRange);
   const selectedRadiusBand = RADIUS_OPTIONS.find((o) => o.value === mapRadius);
+  const hasActiveMapFilter =
+    mapSearch.trim() !== "" || mapCategory !== "all" || mapPriceRange !== "all" || mapRadius !== "all";
 
   const { data: mapCandidates, isLoading: isMapCandidatesLoading } = useUmkm({
     search: mapSearch.trim() || undefined,
@@ -450,6 +452,15 @@ export default function LandingPage() {
     max_dist_m: selectedRadiusBand?.max,
     limit: 100,
   });
+
+  // Only fly/zoom to the results while a filter is actually active -- on
+  // the unfiltered "all 200+ businesses" default view there's nothing
+  // useful to fit bounds to (they're scattered across every district),
+  // and it would fight the user's own panning on first load.
+  const mapFlyToBounds =
+    hasActiveMapFilter && mapCandidates
+      ? mapCandidates.rows.map((row) => [row.latitude, row.longitude] as [number, number])
+      : null;
 
   return (
     <div className="flex min-h-svh flex-col bg-neutral-0 text-neutral-900">
@@ -689,14 +700,34 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <p className="self-start font-jakarta text-b9 text-neutral-500">
-            {isMapCandidatesLoading
-              ? "Memuat usaha..."
-              : `${mapCandidates?.total ?? 0} usaha ditemukan`}
-          </p>
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <p className="font-jakarta text-b9 text-neutral-500">
+              {isMapCandidatesLoading
+                ? "Memuat usaha..."
+                : `${mapCandidates?.total ?? 0} usaha ditemukan`}
+            </p>
+            {/* "make sure the user knows you are here" -- surface WHY the
+                pulse marker might be missing instead of silently showing
+                nothing when permission is denied/unavailable. */}
+            {locationStatus === "denied" && (
+              <p className="font-jakarta text-b9 text-behavior-red-30">
+                Akses lokasi ditolak -- aktifkan izin lokasi browser untuk melihat posisi Anda di peta.
+              </p>
+            )}
+            {locationStatus === "unsupported" && (
+              <p className="font-jakarta text-b9 text-neutral-500">
+                Perangkat/browser ini tidak mendukung deteksi lokasi.
+              </p>
+            )}
+            {locationStatus === "error" && (
+              <p className="font-jakarta text-b9 text-behavior-red-30">
+                Tidak dapat mendeteksi lokasi Anda saat ini.
+              </p>
+            )}
+          </div>
 
           <div className="relative h-[320px] w-full overflow-hidden rounded-2xl border border-neutral-200 shadow-lg sm:h-[420px] md:h-[480px]">
-            <LeafletMap className="h-full w-full" scrollWheelZoom={false}>
+            <LeafletMap className="h-full w-full" scrollWheelZoom={false} flyToBounds={mapFlyToBounds}>
               <GeoJsonLayer data={grid} modelAccuracy={modelAccuracy} />
               <UmkmMarkerLayer rows={mapCandidates?.rows ?? []} />
               {location && (
@@ -707,6 +738,13 @@ export default function LandingPage() {
                 />
               )}
             </LeafletMap>
+            {!isMapCandidatesLoading && hasActiveMapFilter && mapCandidates?.rows.length === 0 && (
+              <div className="absolute inset-0 z-[850] flex items-center justify-center bg-neutral-0/70 backdrop-blur-[1px]">
+                <p className="rounded-xl bg-neutral-0 px-4 py-2 font-jakarta text-b8 text-neutral-600 shadow-sm">
+                  Tidak ada usaha yang cocok dengan pencarian ini.
+                </p>
+              </div>
+            )}
             <div className="absolute bottom-3 right-3 z-[900] flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-0/95 px-3 py-1.5 font-jakarta text-b9 font-semibold text-neutral-900 shadow-sm backdrop-blur-sm">
               <MapPin
                 className="size-3.5 text-primary-teal-70"

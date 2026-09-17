@@ -32,12 +32,24 @@ type LocationState = {
  */
 export const useLocationStore = create<LocationState>((set, get) => ({
   location: null,
-  status: typeof navigator !== "undefined" && navigator.geolocation ? "idle" : "unsupported",
+  // Always "idle" at module-init time, on both server and client -- this
+  // used to branch on `typeof navigator`, which is undefined during SSR
+  // but defined in the browser, so the very first server-rendered HTML
+  // and the client's first render disagreed on `status` (a real
+  // hydration-mismatch bug: any component rendering different content
+  // for "unsupported" vs "idle" would fail to hydrate cleanly). Detecting
+  // "unsupported" now happens inside start() below instead, which only
+  // ever runs client-side (from a useEffect), so it can never run during
+  // SSR in the first place.
+  status: "idle",
   watchId: null,
   override: null,
   setOverride: (location) => set({ override: location }),
   start: () => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      set({ status: "unsupported" });
+      return;
+    }
     if (get().watchId !== null) return;
 
     const watchId = navigator.geolocation.watchPosition(

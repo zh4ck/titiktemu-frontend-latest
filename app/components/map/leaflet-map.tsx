@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import type { LatLngExpression } from "leaflet";
+import { useEffect, useRef } from "react";
+import L, { type LatLngExpression, type LatLngTuple } from "leaflet";
 import { MapContainer, TileLayer, useMap, useMapEvent } from "react-leaflet";
 
 const STUDY_AREA_CENTER: LatLngExpression = [-6.216, 106.811];
@@ -10,6 +10,7 @@ export function LeafletMap({
   center = STUDY_AREA_CENTER,
   zoom = 14,
   flyTo,
+  flyToBounds,
   className,
   children,
   onClick,
@@ -21,6 +22,11 @@ export function LeafletMap({
    * only sets the INITIAL view (react-leaflet doesn't re-pan on prop change
    * after mount). Use this for "click a list item, map flies there." */
   flyTo?: { lat: number; lng: number; zoom?: number } | null;
+  /** Pans/zooms to fit ALL of the given [lat, lng] points (e.g. the
+   * results of a search/filter) -- takes priority over `flyTo` when both
+   * are given. A single point flies in at a reasonable fixed zoom instead
+   * of trying to "fit bounds" around one coordinate. */
+  flyToBounds?: LatLngTuple[] | null;
   className?: string;
   children?: React.ReactNode;
   onClick?: (lat: number, lng: number) => void;
@@ -45,7 +51,11 @@ export function LeafletMap({
           this re-pans the map whenever a caller (e.g. clicking a list item)
           changes `center` afterwards. */}
       <RecenterOnChange center={center} />
-      {flyTo && <FlyToLocation lat={flyTo.lat} lng={flyTo.lng} zoom={flyTo.zoom} />}
+      {flyToBounds && flyToBounds.length > 0 ? (
+        <FitBounds points={flyToBounds} />
+      ) : (
+        flyTo && <FlyToLocation lat={flyTo.lat} lng={flyTo.lng} zoom={flyTo.zoom} />
+      )}
       <InvalidateOnResize />
       {children}
     </MapContainer>
@@ -81,6 +91,38 @@ function InvalidateOnResize() {
       if (frame !== null) window.cancelAnimationFrame(frame);
     };
   }, [map]);
+  return null;
+}
+
+/**
+ * Fits the map to a set of points (e.g. search/filter results) instead of
+ * a single target -- used so typing "Blok M" or picking a filter actually
+ * moves/zooms the map to where the matches are, rather than leaving it on
+ * whatever the initial default view was.
+ */
+function FitBounds({ points }: { points: LatLngTuple[] }) {
+  const map = useMap();
+  const lastSignature = useRef<string | null>(null);
+  // Cheap content-equality check so this only re-runs when the actual SET
+  // of points changes, not on every render the parent happens to do (the
+  // `points` array itself is a fresh reference each render).
+  const signature = points.map(([lat, lng]) => `${lat.toFixed(5)},${lng.toFixed(5)}`).join("|");
+
+  useEffect(() => {
+    if (signature === lastSignature.current) return;
+    lastSignature.current = signature;
+    if (points.length === 0) return;
+
+    if (points.length === 1) {
+      map.flyTo(points[0], Math.max(map.getZoom(), 15), { duration: 0.75 });
+      return;
+    }
+
+    const bounds = L.latLngBounds(points);
+    map.flyToBounds(bounds, { padding: [48, 48], maxZoom: 16, duration: 0.75 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature]);
+
   return null;
 }
 
