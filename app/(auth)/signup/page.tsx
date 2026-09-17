@@ -13,7 +13,6 @@ import { createClient } from "@/app/lib/supabase/client";
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: "umkm", label: "Pelaku Usaha / UMKM" },
   { value: "operator_tod", label: "Operator TOD" },
-  { value: "public_user", label: "Warga / Pengguna Umum" },
 ];
 
 export default function SignUpPage() {

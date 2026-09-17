@@ -119,8 +119,17 @@ export function AppSidebar() {
                 file to every visitor. Also fixes the old logo's blur: the
                 previous titiktemu.png was a 36x36 source stretched to
                 128px. */}
-            <Image src="/logo.png" alt="TitikTemu" width={44} height={44} className="size-11 rounded-lg" />
+            <Image
+              src="/logo.png"
+              alt="TitikTemu"
+              width={44}
+              height={44}
+              className="size-11 rounded-lg"
+            />
           </span>
+          <h2 className="font-outfit font-bold text-green-900 md:text-h4 text-s5 group-data-[collapsible=icon]:hidden">
+            TitikTemu
+          </h2>
         </Link>
         {/* Sidebar collapse/expand now lives here, right under the logo,
             instead of the top mode-header bar (see mode-header.tsx) --
@@ -146,28 +155,29 @@ export function AppSidebar() {
               {navigationItems
                 .filter((item) => item.roles.includes(currentRole))
                 .map(({ label, href, icon: Icon }) => {
-                const isActive = pathname === href || pathname.startsWith(href);
+                  const isActive =
+                    pathname === href || pathname.startsWith(href);
 
-                return (
-                  <SidebarMenuItem
-                    key={href}
-                    className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center"
-                  >
-                    <SidebarMenuButton
-                      render={<Link href={href} aria-label={label} />}
-                      isActive={isActive}
-                      size="lg"
-                      tooltip={label}
-                      className="h-14 rounded-xl px-4 font-sans text-b7 text-primary-600 hover:bg-primary-50 hover:text-primary-700 data-active:bg-primary-700 data-active:text-neutral-0 data-active:hover:bg-primary-700 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-14 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 [&>svg]:size-6"
+                  return (
+                    <SidebarMenuItem
+                      key={href}
+                      className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center"
                     >
-                      <Icon strokeWidth={1.8} />
-                      <span className="group-data-[collapsible=icon]:hidden">
-                        {label}
-                      </span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+                      <SidebarMenuButton
+                        render={<Link href={href} aria-label={label} />}
+                        isActive={isActive}
+                        size="lg"
+                        tooltip={label}
+                        className="h-14 rounded-xl px-4 font-sans text-b7 text-primary-600 hover:bg-primary-50 hover:text-primary-700 data-active:bg-primary-700 data-active:text-neutral-0 data-active:hover:bg-primary-700 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-14 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 [&>svg]:size-6"
+                      >
+                        <Icon strokeWidth={1.8} />
+                        <span className="group-data-[collapsible=icon]:hidden">
+                          {label}
+                        </span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
