@@ -30,9 +30,15 @@ export function LeafletMap({
   className?: string;
   children?: React.ReactNode;
   onClick?: (lat: number, lng: number) => void;
-  /** Default true everywhere the map is a real working tool. Pass false for
-   * a purely decorative/preview embed (e.g. the public landing page) so
-   * the mouse wheel keeps scrolling the page instead of zooming the map. */
+  /** Default true everywhere the map is a real working tool. Pass false (or
+   * a value that starts false and flips true once the visitor engages,
+   * e.g. the public landing page's click-to-activate preview) so the mouse
+   * wheel keeps scrolling the page instead of hijacking it into a zoom
+   * until the user has clearly chosen to interact with the map. Kept in
+   * sync with the live map after mount too (see ScrollWheelZoomSync below)
+   * -- react-leaflet's MapContainer only applies option props once, at
+   * `new L.Map(node, options)` construction time, so a prop change alone
+   * would otherwise silently do nothing after the initial render. */
   scrollWheelZoom?: boolean;
 }) {
   return (
@@ -57,9 +63,27 @@ export function LeafletMap({
         flyTo && <FlyToLocation lat={flyTo.lat} lng={flyTo.lng} zoom={flyTo.zoom} />
       )}
       <InvalidateOnResize />
+      <ScrollWheelZoomSync enabled={scrollWheelZoom} />
       {children}
     </MapContainer>
   );
+}
+
+/**
+ * Applies `scrollWheelZoom` to the already-mounted map on every change, not
+ * just at construction -- see the prop's doc comment above for why this is
+ * needed (MapContainer's own `options` only apply once, at mount).
+ */
+function ScrollWheelZoomSync({ enabled }: { enabled: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (enabled) {
+      map.scrollWheelZoom.enable();
+    } else {
+      map.scrollWheelZoom.disable();
+    }
+  }, [map, enabled]);
+  return null;
 }
 
 /**

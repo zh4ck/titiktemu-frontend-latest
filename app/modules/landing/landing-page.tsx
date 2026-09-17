@@ -276,8 +276,15 @@ const RADIUS_OPTIONS: RadiusBand[] = [
   { value: "2000", label: "< 2 km", max: 2_000 },
 ];
 
+// `h-12!` forces this over SelectTrigger's own `data-[size=default]:h-8` --
+// a plain `h-auto` here lost that specificity fight (both are single
+// utility classes, but the data-attribute-scoped one wins on source order),
+// so the dropdowns rendered visibly shorter than the search bar next to
+// them. The search bar below now also gets an explicit `h-12` instead of
+// relying on padding, so both are pixel-identical rather than coincidentally
+// close.
 const FILTER_DROPDOWN_CLASSNAME =
-  "h-auto w-auto min-w-0 rounded-xl border-neutral-200 bg-neutral-0 px-4 py-3 font-jakarta text-b8 text-neutral-600 shadow-sm hover:bg-neutral-50 focus-visible:ring-primary-teal-60";
+  "h-12! w-auto min-w-0 rounded-xl border-neutral-200 bg-neutral-0 px-4 font-jakarta text-b8 text-neutral-600 shadow-sm hover:bg-neutral-50 focus-visible:ring-primary-teal-60";
 
 function SectionHeading({
   title,
@@ -438,6 +445,13 @@ export default function LandingPage() {
   const [mapCategory, setMapCategory] = useState("all");
   const [mapPriceRange, setMapPriceRange] = useState("all");
   const [mapRadius, setMapRadius] = useState("all");
+
+  // Scroll-wheel zoom starts OFF (a visitor scrolling PAST this preview map
+  // on the landing page shouldn't get their scroll hijacked into a zoom),
+  // and turns on the moment they actually click/tap the map -- at that point
+  // they've clearly engaged with it, so the wheel should zoom it instead of
+  // scrolling the page. The +/- buttons always work regardless.
+  const [mapScrollZoomActive, setMapScrollZoomActive] = useState(false);
 
   const selectedPriceBand = PRICE_RANGE_OPTIONS.find((o) => o.value === mapPriceRange);
   const selectedRadiusBand = RADIUS_OPTIONS.find((o) => o.value === mapRadius);
@@ -661,7 +675,7 @@ export default function LandingPage() {
           />
 
           <div className="flex w-full flex-col gap-3 sm:flex-row">
-            <div className="flex flex-1 items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-0 px-4 py-3 shadow-sm">
+            <div className="flex h-12 flex-1 items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-0 px-4 shadow-sm">
               <MapPin
                 className="size-4 shrink-0 text-neutral-400"
                 aria-hidden="true"
@@ -726,8 +740,15 @@ export default function LandingPage() {
             )}
           </div>
 
-          <div className="relative h-[320px] w-full overflow-hidden rounded-2xl border border-neutral-200 shadow-lg sm:h-[420px] md:h-[480px]">
-            <LeafletMap className="h-full w-full" scrollWheelZoom={false} flyToBounds={mapFlyToBounds}>
+          <div
+            className="relative h-[320px] w-full overflow-hidden rounded-2xl border border-neutral-200 shadow-lg sm:h-[420px] md:h-[480px]"
+            onClick={() => setMapScrollZoomActive(true)}
+          >
+            <LeafletMap
+              className="h-full w-full"
+              scrollWheelZoom={mapScrollZoomActive}
+              flyToBounds={mapFlyToBounds}
+            >
               <GeoJsonLayer data={grid} modelAccuracy={modelAccuracy} />
               <UmkmMarkerLayer rows={mapCandidates?.rows ?? []} />
               {location && (
@@ -738,6 +759,13 @@ export default function LandingPage() {
                 />
               )}
             </LeafletMap>
+            {!mapScrollZoomActive && (
+              <div className="pointer-events-none absolute inset-0 z-[850] flex items-end justify-center pb-4">
+                <p className="rounded-full bg-neutral-900/70 px-3 py-1.5 font-jakarta text-b9 text-neutral-0">
+                  Klik peta untuk mengaktifkan zoom dengan scroll
+                </p>
+              </div>
+            )}
             {!isMapCandidatesLoading && hasActiveMapFilter && mapCandidates?.rows.length === 0 && (
               <div className="absolute inset-0 z-[850] flex items-center justify-center bg-neutral-0/70 backdrop-blur-[1px]">
                 <p className="rounded-xl bg-neutral-0 px-4 py-2 font-jakarta text-b8 text-neutral-600 shadow-sm">
